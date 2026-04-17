@@ -1,0 +1,466 @@
+// Zyrix FinSuite Backend — Prisma Schema
+// Full ERP + CRM + AI + Payment
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────
+
+enum Language {
+  AR
+  TR
+  EN
+}
+
+enum Currency {
+  SAR
+  TRY
+  USD
+  EUR
+}
+
+enum MerchantStatus {
+  ACTIVE
+  SUSPENDED
+  TRIAL
+  EXPIRED
+}
+
+enum PlanName {
+  STARTER
+  BUSINESS
+  PRO
+  ENTERPRISE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum DealStage {
+  LEAD
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
+  FINANCE
+  ANALYST
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  SUCCESS
+  ERROR
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum SubInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum SubStatus {
+  ACTIVE
+  CANCELLED
+  PAST_DUE
+  TRIAL
+}
+
+// ─── Merchant ────────────────────────────────────────────────
+
+model Merchant {
+  id             String         @id @default(uuid())
+  name           String
+  email          String         @unique
+  phone          String         @unique
+  passwordHash   String
+  merchantId     String         @unique @default(cuid())
+  language       Language       @default(TR)
+  currency       Currency       @default(TRY)
+  status         MerchantStatus @default(TRIAL)
+  plan           PlanName       @default(STARTER)
+  businessName   String?
+  businessType   String?
+  country        String         @default("TR")
+  timezone       String         @default("Europe/Istanbul")
+  onboardingDone Boolean        @default(false)
+  trialEndsAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  invoices       Invoice[]
+  customers      Customer[]
+  deals          Deal[]
+  tasks          Task[]
+  expenses       Expense[]
+  aiConversations AiConversation[]
+  cashFlowEntries CashFlowEntry[]
+  commissions    Commission[]
+  campaigns      Campaign[]
+  teamMembers    TeamMember[]
+  notifications  Notification[]
+  subscriptions  Subscription[]
+  paymentLinks   PaymentLink[]
+  featureFlags   FeatureFlag[]
+
+  @@map("merchants")
+}
+
+// ─── Invoice ─────────────────────────────────────────────────
+
+model Invoice {
+  id           String        @id @default(uuid())
+  merchantId   String
+  invoiceNumber String       @unique
+  customerName String
+  customerEmail String?
+  customerPhone String?
+  customerTaxId String?
+  items        Json
+  subtotal     Decimal       @db.Decimal(18, 2)
+  vatRate      Decimal       @default(20) @db.Decimal(5, 2)
+  vatAmount    Decimal       @db.Decimal(18, 2)
+  total        Decimal       @db.Decimal(18, 2)
+  currency     String        @default("TRY")
+  status       InvoiceStatus @default(DRAFT)
+  dueDate      DateTime
+  paidDate     DateTime?
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  merchant     Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+// ─── CRM — Customer ──────────────────────────────────────────
+
+model Customer {
+  id             String    @id @default(uuid())
+  merchantId     String
+  name           String
+  email          String?
+  phone          String?
+  company        String?
+  country        String?
+  address        String?
+  tags           String[]
+  loyaltyPoints  Int       @default(0)
+  totalSpent     Decimal   @default(0) @db.Decimal(18, 2)
+  healthScore    Int       @default(50)
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  merchant       Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  deals          Deal[]
+  tasks          Task[]
+
+  @@map("customers")
+}
+
+// ─── CRM — Deal (Pipeline) ───────────────────────────────────
+
+model Deal {
+  id            String    @id @default(uuid())
+  merchantId    String
+  customerId    String?
+  title         String
+  value         Decimal   @db.Decimal(18, 2)
+  currency      String    @default("TRY")
+  stage         DealStage @default(LEAD)
+  probability   Int       @default(20)
+  expectedClose DateTime?
+  notes         String?
+  lostReason    String?
+  wonAt         DateTime?
+  lostAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  merchant      Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  customer      Customer? @relation(fields: [customerId], references: [id])
+
+  @@map("deals")
+}
+
+// ─── Task ────────────────────────────────────────────────────
+
+model Task {
+  id          String       @id @default(uuid())
+  merchantId  String
+  customerId  String?
+  title       String
+  description String?
+  dueDate     DateTime?
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(TODO)
+  assignedTo  String?
+  completedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  merchant    Merchant     @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+
+  @@map("tasks")
+}
+
+// ─── Expense ─────────────────────────────────────────────────
+
+model Expense {
+  id          String   @id @default(uuid())
+  merchantId  String
+  category    String
+  description String
+  amount      Decimal  @db.Decimal(18, 2)
+  currency    String   @default("TRY")
+  date        DateTime
+  receipt     String?
+  createdAt   DateTime @default(now())
+  merchant    Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("expenses")
+}
+
+// ─── AI Conversation ─────────────────────────────────────────
+
+model AiConversation {
+  id         String   @id @default(uuid())
+  merchantId String
+  title      String?
+  messages   Json
+  context    Json?
+  tokens     Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("ai_conversations")
+}
+
+// ─── Cash Flow ───────────────────────────────────────────────
+
+model CashFlowEntry {
+  id          String   @id @default(uuid())
+  merchantId  String
+  date        DateTime
+  amount      Decimal  @db.Decimal(18, 2)
+  currency    String   @default("TRY")
+  type        String
+  category    String
+  description String?
+  isProjected Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  merchant    Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("cash_flow_entries")
+}
+
+// ─── Commission ──────────────────────────────────────────────
+
+model Commission {
+  id         String   @id @default(uuid())
+  merchantId String
+  agentName  String
+  dealId     String?
+  amount     Decimal  @db.Decimal(18, 2)
+  rate       Decimal  @db.Decimal(5, 2)
+  status     String   @default("PENDING")
+  paidAt     DateTime?
+  createdAt  DateTime @default(now())
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("commissions")
+}
+
+// ─── Campaign ────────────────────────────────────────────────
+
+model Campaign {
+  id          String         @id @default(uuid())
+  merchantId  String
+  name        String
+  type        String
+  subject     String?
+  content     String?
+  targetTags  String[]
+  status      CampaignStatus @default(DRAFT)
+  sentCount   Int            @default(0)
+  openCount   Int            @default(0)
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime       @default(now())
+  merchant    Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("campaigns")
+}
+
+// ─── Team Member ─────────────────────────────────────────────
+
+model TeamMember {
+  id           String   @id @default(uuid())
+  merchantId   String
+  name         String
+  email        String
+  passwordHash String
+  role         String   @default("MEMBER")
+  permissions  Json     @default("{}")
+  isActive     Boolean  @default(true)
+  lastActiveAt DateTime?
+  createdAt    DateTime @default(now())
+  merchant     Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantId, email])
+  @@map("team_members")
+}
+
+// ─── Notification ────────────────────────────────────────────
+
+model Notification {
+  id         String           @id @default(uuid())
+  merchantId String
+  title      String
+  body       String
+  type       NotificationType @default(INFO)
+  isRead     Boolean          @default(false)
+  data       Json?
+  createdAt  DateTime         @default(now())
+  merchant   Merchant         @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ─── Subscription ────────────────────────────────────────────
+
+model Subscription {
+  id                 String      @id @default(uuid())
+  merchantId         String
+  planName           PlanName
+  amount             Decimal     @db.Decimal(18, 2)
+  currency           String      @default("USD")
+  interval           SubInterval @default(MONTHLY)
+  status             SubStatus   @default(TRIAL)
+  currentPeriodStart DateTime    @default(now())
+  currentPeriodEnd   DateTime
+  cancelledAt        DateTime?
+  createdAt          DateTime    @default(now())
+  merchant           Merchant    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// ─── Payment Link ────────────────────────────────────────────
+
+model PaymentLink {
+  id         String   @id @default(uuid())
+  merchantId String
+  title      String
+  amount     Decimal  @db.Decimal(18, 2)
+  currency   String   @default("TRY")
+  url        String   @unique
+  isActive   Boolean  @default(true)
+  expiresAt  DateTime?
+  usageCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("payment_links")
+}
+
+// ─── OTP ─────────────────────────────────────────────────────
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("otp_codes")
+}
+
+// ─── Admin ───────────────────────────────────────────────────
+
+model AdminUser {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         AdminRole @default(SUPPORT)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  auditLogs    AuditLog[]
+
+  @@map("admin_users")
+}
+
+// ─── Audit Log ───────────────────────────────────────────────
+
+model AuditLog {
+  id         String    @id @default(uuid())
+  adminId    String
+  action     String
+  targetType String
+  targetId   String?
+  details    Json?
+  ipAddress  String?
+  createdAt  DateTime  @default(now())
+  admin      AdminUser @relation(fields: [adminId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// ─── Feature Flag ────────────────────────────────────────────
+
+model FeatureFlag {
+  id            String   @id @default(uuid())
+  merchantId    String
+  feature       String
+  isEnabled     Boolean  @default(true)
+  overrideNote  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  merchant      Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantId, feature])
+  @@map("feature_flags")
+}
