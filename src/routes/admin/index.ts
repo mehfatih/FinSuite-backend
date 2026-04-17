@@ -14,6 +14,7 @@ router.use(authenticateAdmin as any);
 router.get("/stats", adminStatsController.getStats);
 router.post("/admins", adminAuthController.createAdmin);
 router.get("/merchants", adminMerchantsController.list);
+router.post("/merchants", adminMerchantsController.create);
 router.get("/merchants/:id", adminMerchantsController.getById);
 router.put("/merchants/:id/status", adminMerchantsController.updateStatus);
 router.put("/merchants/:id/plan", adminMerchantsController.updatePlan);
