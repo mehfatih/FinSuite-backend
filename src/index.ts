@@ -48,6 +48,12 @@ app.use("/api/deals", dealRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/admin", adminRoutes);
+import profileRoutes      from "./routes/profile";
+import notificationRoutes from "./routes/notifications";
+import paymentRoutes      from "./routes/payments";
+app.use("/api/profile",       profileRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/payments",      paymentRoutes);
 
 // ─── Error Handlers ───────────────────────────────────────────
 app.use(notFoundHandler);
