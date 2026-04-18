@@ -3,7 +3,7 @@ import { env } from "../config/env";
 
 const resend = new Resend(env.resendApiKey);
 
-const FROM = "Zyrix FinSuite <noreply@finsuite.zyrix.co>";
+const FROM = "Zyrix FinSuite <noreply@zyrix.co>";
 
 // ── Welcome Email ─────────────────────────────────
 export async function sendWelcomeEmail(opts: {
