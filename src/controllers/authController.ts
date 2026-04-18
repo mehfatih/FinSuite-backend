@@ -3,14 +3,12 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "../config/database";
 import { env } from "../config/env";
+import { sendWelcomeEmail } from "../services/emailService";
 
 const h = (fn: Function): RequestHandler => fn as RequestHandler;
 
-// ── Turkish phone validation ──────────────────────
-// Valid formats: +905XXXXXXXXX or 05XXXXXXXXX (11 digits starting with 05)
 function isValidTurkishPhone(phone: string): boolean {
   const cleaned = phone.replace(/[\s\-\(\)]/g, "");
-  // +90 5XX XXX XX XX  or  05XX XXX XX XX
   return /^(\+90|0)5[0-9]{9}$/.test(cleaned);
 }
 
@@ -20,39 +18,28 @@ function normalizeTurkishPhone(phone: string): string {
   return cleaned;
 }
 
-// ── Subscription / grace period logic ────────────
 async function checkAndUpdateMerchantStatus(merchantId: string) {
   const merchant = await prisma.merchant.findUnique({
     where: { id: merchantId },
     include: { subscriptions: { orderBy: { createdAt: "desc" }, take: 1 } },
   });
   if (!merchant) return;
-
   const now = new Date();
   const sub = merchant.subscriptions[0];
   if (!sub) return;
 
-  // Still in trial
-  if (sub.status === "TRIAL" && merchant.trialEndsAt && now < merchant.trialEndsAt) return;
-
-  // Trial expired → move to EXPIRED with grace period note
   if (sub.status === "TRIAL" && merchant.trialEndsAt && now > merchant.trialEndsAt) {
     await prisma.merchant.update({ where: { id: merchantId }, data: { status: "EXPIRED" } });
     await prisma.subscription.update({ where: { id: sub.id }, data: { status: "PAST_DUE" } });
     return;
   }
 
-  // Active subscription — check if past end date
   if (sub.status === "ACTIVE" && now > sub.currentPeriodEnd) {
     const gracePeriodEnd = new Date(sub.currentPeriodEnd);
-    gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 10); // 10 days grace
-
+    gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 10);
     if (now <= gracePeriodEnd) {
-      // Within grace period — keep ACTIVE but mark PAST_DUE
       await prisma.subscription.update({ where: { id: sub.id }, data: { status: "PAST_DUE" } });
-      // Don't suspend yet — still accessible
     } else {
-      // Grace period over — suspend but KEEP DATA
       await prisma.merchant.update({ where: { id: merchantId }, data: { status: "SUSPENDED" } });
     }
   }
@@ -64,29 +51,26 @@ export const authController = {
     try {
       const { name, email, phone, password, country, language, currency, businessName } = req.body;
 
-      // Validate required fields
       if (!name || !email || !phone || !password) {
         res.status(400).json({ success: false, error: "Name, email, phone and password are required" });
         return;
       }
 
-      // Validate Turkish phone format
       if (!isValidTurkishPhone(phone)) {
         res.status(400).json({
           success: false,
-          error: "Invalid phone number. Please enter a valid Turkish number (e.g. 0532 123 45 67 or +90 532 123 45 67)",
+          error: "Geçersiz telefon numarası. Lütfen geçerli bir Türkiye numarası girin (örn: 0532 123 45 67)",
         });
         return;
       }
 
       const normalizedPhone = normalizeTurkishPhone(phone);
 
-      // Check duplicates
       const existing = await prisma.merchant.findFirst({
         where: { OR: [{ email }, { phone: normalizedPhone }] },
       });
       if (existing) {
-        res.status(409).json({ success: false, error: "Email or phone number already registered" });
+        res.status(409).json({ success: false, error: "Bu e-posta veya telefon numarası zaten kayıtlı" });
         return;
       }
 
@@ -129,6 +113,13 @@ export const authController = {
         },
       });
 
+      // Send welcome email (non-blocking)
+      sendWelcomeEmail({
+        to: merchant.email,
+        name: merchant.name,
+        trialEndsAt: merchant.trialEndsAt!,
+      }).catch(err => console.error("Welcome email failed:", err));
+
       const token = jwt.sign(
         { id: merchant.id, email: merchant.email, plan: merchant.plan },
         env.jwtSecret,
@@ -138,7 +129,7 @@ export const authController = {
       res.status(201).json({ success: true, data: { merchant, token } });
     } catch (err) {
       console.error("Register error:", err);
-      res.status(500).json({ success: false, error: "Registration failed" });
+      res.status(500).json({ success: false, error: "Kayıt başarısız oldu" });
     }
   }),
 
@@ -147,35 +138,32 @@ export const authController = {
       const { email, password } = req.body;
 
       if (!email || !password) {
-        res.status(400).json({ success: false, error: "Email and password required" });
+        res.status(400).json({ success: false, error: "E-posta ve şifre gerekli" });
         return;
       }
 
       const merchant = await prisma.merchant.findUnique({ where: { email } });
 
       if (!merchant || !merchant.passwordHash) {
-        res.status(401).json({ success: false, error: "Invalid credentials" });
+        res.status(401).json({ success: false, error: "Geçersiz e-posta veya şifre" });
         return;
       }
 
       const valid = await bcrypt.compare(password, merchant.passwordHash);
       if (!valid) {
-        res.status(401).json({ success: false, error: "Invalid credentials" });
+        res.status(401).json({ success: false, error: "Geçersiz e-posta veya şifre" });
         return;
       }
 
-      // Check & update subscription status (grace period, expiry)
       await checkAndUpdateMerchantStatus(merchant.id);
 
-      // Re-fetch updated merchant
       const updated = await prisma.merchant.findUnique({ where: { id: merchant.id } });
-      if (!updated) { res.status(500).json({ success: false, error: "Login failed" }); return; }
+      if (!updated) { res.status(500).json({ success: false, error: "Giriş başarısız" }); return; }
 
-      // Block only if fully suspended (past grace period)
       if (updated.status === "SUSPENDED") {
         res.status(403).json({
           success: false,
-          error: "Your account has been suspended due to non-payment. Your data is safe — please contact support to reactivate.",
+          error: "Hesabınız askıya alındı. Verileriniz güvende — yeniden aktifleştirmek için destek ile iletişime geçin.",
         });
         return;
       }
@@ -185,6 +173,17 @@ export const authController = {
         env.jwtSecret,
         { expiresIn: env.jwtExpiresIn }
       );
+
+      // Warning for trial expiring in 3 days
+      let warning: string | null = null;
+      if (updated.trialEndsAt) {
+        const daysLeft = Math.ceil((updated.trialEndsAt.getTime() - Date.now()) / 86400000);
+        if (daysLeft <= 3 && daysLeft > 0) {
+          warning = `Deneme süreniz ${daysLeft} gün içinde bitiyor. Kesintisiz devam etmek için abonelik seçin.`;
+        } else if (daysLeft <= 0) {
+          warning = "Deneme süreniz doldu. Lütfen bir abonelik planı seçin.";
+        }
+      }
 
       res.status(200).json({
         success: true,
@@ -197,17 +196,12 @@ export const authController = {
             plan: updated.plan, country: updated.country,
             onboardingDone: updated.onboardingDone, trialEndsAt: updated.trialEndsAt,
           },
-          // Warn if in grace period or trial expiring soon
-          warning: updated.status === "EXPIRED"
-            ? "Your trial has ended. Please subscribe to continue using all features."
-            : updated.trialEndsAt && new Date() > new Date(updated.trialEndsAt.getTime() - 3 * 86400000)
-            ? `Your trial ends on ${updated.trialEndsAt.toLocaleDateString("tr-TR")}. Please subscribe to avoid interruption.`
-            : null,
+          warning,
         },
       });
     } catch (err) {
       console.error("Login error:", err);
-      res.status(500).json({ success: false, error: "Login failed" });
+      res.status(500).json({ success: false, error: "Giriş başarısız" });
     }
   }),
 
@@ -238,12 +232,12 @@ export const authController = {
       const merchant = await prisma.merchant.findUnique({ where: { id: merchantId } });
       if (!merchant || !merchant.passwordHash) { res.status(404).json({ success: false, error: "Merchant not found" }); return; }
       const valid = await bcrypt.compare(currentPassword, merchant.passwordHash);
-      if (!valid) { res.status(401).json({ success: false, error: "Current password incorrect" }); return; }
+      if (!valid) { res.status(401).json({ success: false, error: "Mevcut şifre hatalı" }); return; }
       const passwordHash = await bcrypt.hash(newPassword, 12);
       await prisma.merchant.update({ where: { id: merchantId }, data: { passwordHash } });
-      res.status(200).json({ success: true, message: "Password changed successfully" });
+      res.status(200).json({ success: true, message: "Şifre başarıyla değiştirildi" });
     } catch (err) {
-      res.status(500).json({ success: false, error: "Failed to change password" });
+      res.status(500).json({ success: false, error: "Şifre değiştirilemedi" });
     }
   }),
 };
