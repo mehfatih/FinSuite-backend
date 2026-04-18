@@ -123,23 +123,25 @@ model Merchant {
   timezone       String         @default("Europe/Istanbul")
   onboardingDone Boolean        @default(false)
   trialEndsAt    DateTime?
+  adminNotes     String?
+  archivedAt     DateTime?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  invoices       Invoice[]
-  customers      Customer[]
-  deals          Deal[]
-  tasks          Task[]
-  expenses       Expense[]
+  invoices        Invoice[]
+  customers       Customer[]
+  deals           Deal[]
+  tasks           Task[]
+  expenses        Expense[]
   aiConversations AiConversation[]
   cashFlowEntries CashFlowEntry[]
-  commissions    Commission[]
-  campaigns      Campaign[]
-  teamMembers    TeamMember[]
-  notifications  Notification[]
-  subscriptions  Subscription[]
-  paymentLinks   PaymentLink[]
-  featureFlags   FeatureFlag[]
+  commissions     Commission[]
+  campaigns       Campaign[]
+  teamMembers     TeamMember[]
+  notifications   Notification[]
+  subscriptions   Subscription[]
+  paymentLinks    PaymentLink[]
+  featureFlags    FeatureFlag[]
 
   @@map("merchants")
 }
@@ -147,26 +149,26 @@ model Merchant {
 // ─── Invoice ─────────────────────────────────────────────────
 
 model Invoice {
-  id           String        @id @default(uuid())
-  merchantId   String
-  invoiceNumber String       @unique
-  customerName String
+  id            String        @id @default(uuid())
+  merchantId    String
+  invoiceNumber String        @unique
+  customerName  String
   customerEmail String?
   customerPhone String?
   customerTaxId String?
-  items        Json
-  subtotal     Decimal       @db.Decimal(18, 2)
-  vatRate      Decimal       @default(20) @db.Decimal(5, 2)
-  vatAmount    Decimal       @db.Decimal(18, 2)
-  total        Decimal       @db.Decimal(18, 2)
-  currency     String        @default("TRY")
-  status       InvoiceStatus @default(DRAFT)
-  dueDate      DateTime
-  paidDate     DateTime?
-  notes        String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  merchant     Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  items         Json
+  subtotal      Decimal       @db.Decimal(18, 2)
+  vatRate       Decimal       @default(20) @db.Decimal(5, 2)
+  vatAmount     Decimal       @db.Decimal(18, 2)
+  total         Decimal       @db.Decimal(18, 2)
+  currency      String        @default("TRY")
+  status        InvoiceStatus @default(DRAFT)
+  dueDate       DateTime
+  paidDate      DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  merchant      Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@map("invoices")
 }
@@ -174,24 +176,24 @@ model Invoice {
 // ─── CRM — Customer ──────────────────────────────────────────
 
 model Customer {
-  id             String    @id @default(uuid())
-  merchantId     String
-  name           String
-  email          String?
-  phone          String?
-  company        String?
-  country        String?
-  address        String?
-  tags           String[]
-  loyaltyPoints  Int       @default(0)
-  totalSpent     Decimal   @default(0) @db.Decimal(18, 2)
-  healthScore    Int       @default(50)
-  notes          String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  merchant       Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  deals          Deal[]
-  tasks          Task[]
+  id            String    @id @default(uuid())
+  merchantId    String
+  name          String
+  email         String?
+  phone         String?
+  company       String?
+  country       String?
+  address       String?
+  tags          String[]
+  loyaltyPoints Int       @default(0)
+  totalSpent    Decimal   @default(0) @db.Decimal(18, 2)
+  healthScore   Int       @default(50)
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  merchant      Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  deals         Deal[]
+  tasks         Task[]
 
   @@map("customers")
 }
@@ -295,16 +297,16 @@ model CashFlowEntry {
 // ─── Commission ──────────────────────────────────────────────
 
 model Commission {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   merchantId String
   agentName  String
   dealId     String?
-  amount     Decimal  @db.Decimal(18, 2)
-  rate       Decimal  @db.Decimal(5, 2)
-  status     String   @default("PENDING")
+  amount     Decimal   @db.Decimal(18, 2)
+  rate       Decimal   @db.Decimal(5, 2)
+  status     String    @default("PENDING")
   paidAt     DateTime?
-  createdAt  DateTime @default(now())
-  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  merchant   Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@map("commissions")
 }
@@ -333,17 +335,17 @@ model Campaign {
 // ─── Team Member ─────────────────────────────────────────────
 
 model TeamMember {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   merchantId   String
   name         String
   email        String
   passwordHash String
-  role         String   @default("MEMBER")
-  permissions  Json     @default("{}")
-  isActive     Boolean  @default(true)
+  role         String    @default("MEMBER")
+  permissions  Json      @default("{}")
+  isActive     Boolean   @default(true)
   lastActiveAt DateTime?
-  createdAt    DateTime @default(now())
-  merchant     Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  merchant     Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@unique([merchantId, email])
   @@map("team_members")
@@ -387,17 +389,17 @@ model Subscription {
 // ─── Payment Link ────────────────────────────────────────────
 
 model PaymentLink {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   merchantId String
   title      String
-  amount     Decimal  @db.Decimal(18, 2)
-  currency   String   @default("TRY")
-  url        String   @unique
-  isActive   Boolean  @default(true)
+  amount     Decimal   @db.Decimal(18, 2)
+  currency   String    @default("TRY")
+  url        String    @unique
+  isActive   Boolean   @default(true)
   expiresAt  DateTime?
-  usageCount Int      @default(0)
-  createdAt  DateTime @default(now())
-  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  usageCount Int       @default(0)
+  createdAt  DateTime  @default(now())
+  merchant   Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@map("payment_links")
 }
@@ -419,15 +421,15 @@ model OtpCode {
 // ─── Admin ───────────────────────────────────────────────────
 
 model AdminUser {
-  id           String    @id @default(uuid())
-  email        String    @unique
+  id           String     @id @default(uuid())
+  email        String     @unique
   passwordHash String
   name         String
-  role         AdminRole @default(SUPPORT)
-  isActive     Boolean   @default(true)
+  role         AdminRole  @default(SUPPORT)
+  isActive     Boolean    @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
   auditLogs    AuditLog[]
 
   @@map("admin_users")
@@ -452,14 +454,14 @@ model AuditLog {
 // ─── Feature Flag ────────────────────────────────────────────
 
 model FeatureFlag {
-  id            String   @id @default(uuid())
-  merchantId    String
-  feature       String
-  isEnabled     Boolean  @default(true)
-  overrideNote  String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  merchant      Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  id           String   @id @default(uuid())
+  merchantId   String
+  feature      String
+  isEnabled    Boolean  @default(true)
+  overrideNote String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  merchant     Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@unique([merchantId, feature])
   @@map("feature_flags")
