@@ -1,7 +1,4 @@
 // Zyrix FinSuite — Prisma Schema v3.0
-// v1-v2: E-Fatura, AI Assistant, Muhasebeci, Factoring, AI Skor
-// v3: Stok, Taksit, Çek/Senet, WhatsApp, Personel,
-//     Kartvizit, Abonelik, Pazar Yeri, Vergi Takvimi, Benchmark
 
 generator client {
   provider = "prisma-client-js"
@@ -12,36 +9,176 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Enums ───────────────────────────────────────────────────
+enum Language {
+  AR
+  TR
+  EN
+}
 
-enum Language          { AR TR EN }
-enum Currency          { SAR TRY USD EUR }
-enum MerchantStatus    { ACTIVE SUSPENDED TRIAL EXPIRED }
-enum PlanName          { STARTER BUSINESS PRO ENTERPRISE }
-enum InvoiceStatus     { DRAFT SENT PAID OVERDUE CANCELLED }
-enum DealStage         { LEAD QUALIFIED PROPOSAL NEGOTIATION WON LOST }
-enum TaskPriority      { LOW MEDIUM HIGH URGENT }
-enum TaskStatus        { TODO IN_PROGRESS DONE CANCELLED }
-enum AdminRole         { SUPER_ADMIN ADMIN SUPPORT FINANCE ANALYST }
-enum NotificationType  { INFO WARNING SUCCESS ERROR }
-enum CampaignStatus    { DRAFT ACTIVE PAUSED COMPLETED }
-enum SubInterval       { MONTHLY YEARLY }
-enum SubStatus         { ACTIVE CANCELLED PAST_DUE TRIAL }
-enum EFaturaStatus     { PENDING SENT ACCEPTED REJECTED CANCELLED }
-enum MuhasebeciAccessLevel { READ_ONLY EXPORT COMMENT }
-enum FactoringStatus   { PENDING APPROVED FUNDED REPAID REJECTED }
+enum Currency {
+  SAR
+  TRY
+  USD
+  EUR
+}
 
-// v3 enums
-enum StockMovementType  { IN OUT ADJUSTMENT RETURN }
-enum CheckType          { RECEIVED ISSUED }
-enum CheckStatus        { PENDING CLEARED BOUNCED CANCELLED }
-enum InstallmentStatus  { PENDING PAID OVERDUE CANCELLED }
-enum PersonnelStatus    { ACTIVE INACTIVE TERMINATED }
-enum RecurringStatus    { ACTIVE PAUSED CANCELLED COMPLETED }
-enum MarketplaceChannel { TRENDYOL HEPSIBURADA AMAZON_TR N11 GETIR }
-enum TaxEventType       { KDV MUHTASAR KURUMLAR GELIR DAMGA SGK OTHER }
+enum MerchantStatus {
+  ACTIVE
+  SUSPENDED
+  TRIAL
+  EXPIRED
+}
 
-// ─── Merchant ────────────────────────────────────────────────
+enum PlanName {
+  STARTER
+  BUSINESS
+  PRO
+  ENTERPRISE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum DealStage {
+  LEAD
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
+  FINANCE
+  ANALYST
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  SUCCESS
+  ERROR
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum SubInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum SubStatus {
+  ACTIVE
+  CANCELLED
+  PAST_DUE
+  TRIAL
+}
+
+enum EFaturaStatus {
+  PENDING
+  SENT
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum MuhasebeciAccessLevel {
+  READ_ONLY
+  EXPORT
+  COMMENT
+}
+
+enum FactoringStatus {
+  PENDING
+  APPROVED
+  FUNDED
+  REPAID
+  REJECTED
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+  RETURN
+}
+
+enum CheckType {
+  RECEIVED
+  ISSUED
+}
+
+enum CheckStatus {
+  PENDING
+  CLEARED
+  BOUNCED
+  CANCELLED
+}
+
+enum InstallmentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PersonnelStatus {
+  ACTIVE
+  INACTIVE
+  TERMINATED
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  COMPLETED
+}
+
+enum MarketplaceChannel {
+  TRENDYOL
+  HEPSIBURADA
+  AMAZON_TR
+  N11
+  GETIR
+}
+
+enum TaxEventType {
+  KDV
+  MUHTASAR
+  KURUMLAR
+  GELIR
+  DAMGA
+  SGK
+  OTHER
+}
 
 model Merchant {
   id             String         @id @default(uuid())
@@ -97,31 +234,29 @@ model Merchant {
   @@map("merchants")
 }
 
-// ─── Invoice ─────────────────────────────────────────────────
-
 model Invoice {
-  id            String        @id @default(uuid())
-  merchantId    String
-  invoiceNumber String        @unique
-  customerName  String
-  customerEmail String?
-  customerPhone String?
-  customerTaxId String?
-  items         Json
-  subtotal      Decimal       @db.Decimal(18, 2)
-  vatRate       Decimal       @default(20) @db.Decimal(5, 2)
-  vatAmount     Decimal       @db.Decimal(18, 2)
-  total         Decimal       @db.Decimal(18, 2)
-  currency      String        @default("TRY")
-  status        InvoiceStatus @default(DRAFT)
-  dueDate       DateTime
-  paidDate      DateTime?
-  notes         String?
+  id             String        @id @default(uuid())
+  merchantId     String
+  invoiceNumber  String        @unique
+  customerName   String
+  customerEmail  String?
+  customerPhone  String?
+  customerTaxId  String?
+  items          Json
+  subtotal       Decimal       @db.Decimal(18, 2)
+  vatRate        Decimal       @default(20) @db.Decimal(5, 2)
+  vatAmount      Decimal       @db.Decimal(18, 2)
+  total          Decimal       @db.Decimal(18, 2)
+  currency       String        @default("TRY")
+  status         InvoiceStatus @default(DRAFT)
+  dueDate        DateTime
+  paidDate       DateTime?
+  notes          String?
   whatsappSentAt DateTime?
   whatsappStatus String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  merchant      Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  merchant       Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   eFatura          EFatura?
   factoringRequest FactoringRequest?
@@ -129,8 +264,6 @@ model Invoice {
 
   @@map("invoices")
 }
-
-// ─── EFatura ─────────────────────────────────────────────────
 
 model EFatura {
   id              String        @id @default(uuid())
@@ -157,8 +290,6 @@ model EFatura {
 
   @@map("e_faturalar")
 }
-
-// ─── Customer ────────────────────────────────────────────────
 
 model Customer {
   id               String    @id @default(uuid())
@@ -188,8 +319,6 @@ model Customer {
   @@map("customers")
 }
 
-// ─── Deal ────────────────────────────────────────────────────
-
 model Deal {
   id            String    @id @default(uuid())
   merchantId    String
@@ -212,8 +341,6 @@ model Deal {
   @@map("deals")
 }
 
-// ─── Task ────────────────────────────────────────────────────
-
 model Task {
   id          String       @id @default(uuid())
   merchantId  String
@@ -233,8 +360,6 @@ model Task {
   @@map("tasks")
 }
 
-// ─── Expense ─────────────────────────────────────────────────
-
 model Expense {
   id          String   @id @default(uuid())
   merchantId  String
@@ -249,8 +374,6 @@ model Expense {
 
   @@map("expenses")
 }
-
-// ─── AI Models ───────────────────────────────────────────────
 
 model AiConversation {
   id         String   @id @default(uuid())
@@ -277,8 +400,6 @@ model AiAssistantChat {
 
   @@map("ai_assistant_chats")
 }
-
-// ─── Other Existing Models ───────────────────────────────────
 
 model CashFlowEntry {
   id          String   @id @default(uuid())
@@ -492,32 +613,26 @@ model FactoringRequest {
   @@map("factoring_requests")
 }
 
-// ═══════════════════════════════════════════════════════════════
-// v3 — Features 6-15
-// ═══════════════════════════════════════════════════════════════
-
-// ── 6: Stok Yönetimi ─────────────────────────────────────────
-
 model StockItem {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   merchantId  String
   name        String
   sku         String?
   barcode     String?
   category    String?
-  unit        String   @default("adet")
-  quantity    Decimal  @default(0) @db.Decimal(18, 3)
-  minQuantity Decimal  @default(0) @db.Decimal(18, 3)
-  costPrice   Decimal? @db.Decimal(18, 2)
-  salePrice   Decimal? @db.Decimal(18, 2)
-  vatRate     Decimal  @default(20) @db.Decimal(5, 2)
-  currency    String   @default("TRY")
+  unit        String    @default("adet")
+  quantity    Decimal   @default(0) @db.Decimal(18, 3)
+  minQuantity Decimal   @default(0) @db.Decimal(18, 3)
+  costPrice   Decimal?  @db.Decimal(18, 2)
+  salePrice   Decimal?  @db.Decimal(18, 2)
+  vatRate     Decimal   @default(20) @db.Decimal(5, 2)
+  currency    String    @default("TRY")
   location    String?
   description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  merchant    Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  merchant    Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   movements   StockMovement[]
 
   @@unique([merchantId, sku])
@@ -541,23 +656,21 @@ model StockMovement {
   @@map("stock_movements")
 }
 
-// ── 7: Taksit & Vade Takibi ──────────────────────────────────
-
 model InstallmentPlan {
-  id               String   @id @default(uuid())
+  id               String    @id @default(uuid())
   merchantId       String
-  invoiceId        String   @unique
+  invoiceId        String    @unique
   customerName     String
   customerPhone    String?
-  totalAmount      Decimal  @db.Decimal(18, 2)
-  currency         String   @default("TRY")
+  totalAmount      Decimal   @db.Decimal(18, 2)
+  currency         String    @default("TRY")
   installmentCount Int
   firstDueDate     DateTime
   notes            String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  merchant         Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  invoice          Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  merchant         Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  invoice          Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   installments     Installment[]
 
   @@map("installment_plans")
@@ -577,8 +690,6 @@ model Installment {
 
   @@map("installments")
 }
-
-// ── 8: Çek & Senet Takibi ────────────────────────────────────
 
 model Check {
   id           String      @id @default(uuid())
@@ -603,8 +714,6 @@ model Check {
 
   @@map("checks")
 }
-
-// ── 10: Personel & SGK ───────────────────────────────────────
 
 model Personnel {
   id          String          @id @default(uuid())
@@ -651,8 +760,6 @@ model SalarySlip {
   @@map("salary_slips")
 }
 
-// ── 11: Dijital Kartvizit ────────────────────────────────────
-
 model PublicProfile {
   id          String   @id @default(uuid())
   merchantId  String   @unique
@@ -677,37 +784,33 @@ model PublicProfile {
   @@map("public_profiles")
 }
 
-// ── 12: Abonelik Faturalandırma ──────────────────────────────
-
 model RecurringInvoice {
-  id           String          @id @default(uuid())
-  merchantId   String
-  customerName String
+  id            String          @id @default(uuid())
+  merchantId    String
+  customerName  String
   customerEmail String?
   customerPhone String?
-  items        Json
-  subtotal     Decimal         @db.Decimal(18, 2)
-  vatRate      Decimal         @default(20) @db.Decimal(5, 2)
-  vatAmount    Decimal         @db.Decimal(18, 2)
-  total        Decimal         @db.Decimal(18, 2)
-  currency     String          @default("TRY")
-  interval     SubInterval     @default(MONTHLY)
-  dayOfMonth   Int             @default(1)
-  startDate    DateTime
-  endDate      DateTime?
-  nextRunDate  DateTime
-  lastRunDate  DateTime?
-  runCount     Int             @default(0)
-  status       RecurringStatus @default(ACTIVE)
-  notes        String?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  merchant     Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  items         Json
+  subtotal      Decimal         @db.Decimal(18, 2)
+  vatRate       Decimal         @default(20) @db.Decimal(5, 2)
+  vatAmount     Decimal         @db.Decimal(18, 2)
+  total         Decimal         @db.Decimal(18, 2)
+  currency      String          @default("TRY")
+  interval      SubInterval     @default(MONTHLY)
+  dayOfMonth    Int             @default(1)
+  startDate     DateTime
+  endDate       DateTime?
+  nextRunDate   DateTime
+  lastRunDate   DateTime?
+  runCount      Int             @default(0)
+  status        RecurringStatus @default(ACTIVE)
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  merchant      Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@map("recurring_invoices")
 }
-
-// ── 13: Pazar Yeri Entegrasyonu ──────────────────────────────
 
 model MarketplaceOrder {
   id              String             @id @default(uuid())
@@ -754,8 +857,6 @@ model MarketplaceIntegration {
   @@map("marketplace_integrations")
 }
 
-// ── 14: Vergi Takvimi ────────────────────────────────────────
-
 model TaxEvent {
   id           String       @id @default(uuid())
   merchantId   String
@@ -777,22 +878,20 @@ model TaxEvent {
   @@map("tax_events")
 }
 
-// ── 15: Benchmark ────────────────────────────────────────────
-
 model BenchmarkSnapshot {
-  id               String   @id @default(uuid())
-  merchantId       String
-  period           String
-  sector           String?
-  province         String?
-  monthlyRevenue   Decimal  @db.Decimal(18, 2)
-  invoiceCount     Int
-  avgInvoiceValue  Decimal  @db.Decimal(18, 2)
-  collectionRate   Decimal  @db.Decimal(5, 2)
-  avgDaysToPay     Int
-  activeCustomers  Int
-  createdAt        DateTime @default(now())
-  merchant         Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid())
+  merchantId      String
+  period          String
+  sector          String?
+  province        String?
+  monthlyRevenue  Decimal  @db.Decimal(18, 2)
+  invoiceCount    Int
+  avgInvoiceValue Decimal  @db.Decimal(18, 2)
+  collectionRate  Decimal  @db.Decimal(5, 2)
+  avgDaysToPay    Int
+  activeCustomers Int
+  createdAt       DateTime @default(now())
+  merchant        Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@unique([merchantId, period])
   @@map("benchmark_snapshots")
