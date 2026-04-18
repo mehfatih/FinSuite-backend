@@ -1,0 +1,11 @@
+import { Router } from "express";
+import { whatsappController } from "../controllers/whatsappController";
+import { merchantAuth } from "../middleware/auth";
+const router = Router();
+router.use(merchantAuth);
+router.get("/status", whatsappController.status);
+router.post("/send-invoice/:invoiceId", whatsappController.sendInvoice);
+router.post("/remind/:invoiceId", whatsappController.sendReminder);
+router.post("/bulk-remind", whatsappController.bulkRemind);
+router.post("/custom", whatsappController.sendCustom);
+export default router;

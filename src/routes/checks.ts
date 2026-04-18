@@ -1,0 +1,11 @@
+import { Router } from "express";
+import { checkController } from "../controllers/checkController";
+import { merchantAuth } from "../middleware/auth";
+const router = Router();
+router.use(merchantAuth);
+router.get("/summary", checkController.summary);
+router.get("/upcoming", checkController.upcoming);
+router.get("/", checkController.list);
+router.post("/", checkController.create);
+router.patch("/:id/status", checkController.updateStatus);
+export default router;

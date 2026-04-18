@@ -1,0 +1,11 @@
+import { Router } from "express";
+import { recurringController } from "../controllers/recurringController";
+import { merchantAuth } from "../middleware/auth";
+const router = Router();
+router.use(merchantAuth);
+router.get("/", recurringController.list);
+router.post("/", recurringController.create);
+router.post("/process-due", recurringController.processDue);
+router.patch("/:id", recurringController.update);
+router.post("/:id/run", recurringController.runNow);
+export default router;
