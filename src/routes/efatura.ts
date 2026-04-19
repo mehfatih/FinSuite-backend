@@ -1,12 +1,14 @@
 import { Router } from "express";
 import { eFaturaController } from "../controllers/eFaturaController";
 import { merchantAuth } from "../middleware/auth";
+
 const router = Router();
-router.use(merchantAuth);
-router.get("/stats", eFaturaController.stats);
-router.get("/", eFaturaController.list);
-router.get("/:id", eFaturaController.getById);
-router.get("/:id/xml", eFaturaController.downloadXML);
-router.post("/", eFaturaController.create);
-router.post("/:id/cancel", eFaturaController.cancel);
+
+router.get("/stats", merchantAuth, eFaturaController.stats);
+router.get("/", merchantAuth, eFaturaController.list);
+router.get("/:id", merchantAuth, eFaturaController.getById);
+router.get("/:id/xml", merchantAuth, eFaturaController.downloadXML);
+router.post("/", merchantAuth, eFaturaController.create);
+router.post("/:id/cancel", merchantAuth, eFaturaController.cancel);
+
 export default router;
