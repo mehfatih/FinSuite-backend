@@ -49,8 +49,12 @@ export const recurringController = {
       const total = subtotal + vatAmount;
 
       const start = new Date(startDate);
-      const nextRun = new Date(start);
-      nextRun.setDate(dayOfMonth);
+      // nextRun: أول دورة — لو dayOfMonth فات في نفس الشهر، ننتقل للشهر الجاي
+      const nextRun = new Date(start.getFullYear(), start.getMonth(), dayOfMonth);
+      if (nextRun <= start) {
+        // اليوم المحدد فات أو نفس اليوم — ابدأ الشهر الجاي
+        nextRun.setMonth(nextRun.getMonth() + 1);
+      }
 
       const recurring = await prisma.recurringInvoice.create({
         data: {

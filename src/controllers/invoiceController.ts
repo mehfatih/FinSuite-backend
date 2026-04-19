@@ -86,9 +86,25 @@ export const invoiceController = {
       });
       if (!existing) { res.status(404).json({ success: false, error: "Invoice not found" }); return; }
 
+      const { customerName, customerEmail, customerPhone, customerTaxId, items, vatRate, currency, dueDate, notes, status } = req.body;
+      const subtotal = items ? (items as any[]).reduce((s: number, i: any) => s + i.quantity * i.unitPrice, 0) : undefined;
+      const vat = vatRate ? parseFloat(vatRate) : undefined;
+      const vatAmount = subtotal !== undefined && vat !== undefined ? subtotal * (vat / 100) : undefined;
+      const total = subtotal !== undefined && vatAmount !== undefined ? subtotal + vatAmount : undefined;
+
       const invoice = await prisma.invoice.update({
         where: { id: req.params.id },
-        data: req.body,
+        data: {
+          ...(customerName && { customerName }),
+          ...(customerEmail !== undefined && { customerEmail }),
+          ...(customerPhone !== undefined && { customerPhone }),
+          ...(customerTaxId !== undefined && { customerTaxId }),
+          ...(items && { items, subtotal, vatRate: vat, vatAmount, total }),
+          ...(currency && { currency }),
+          ...(dueDate && { dueDate: new Date(dueDate) }),
+          ...(notes !== undefined && { notes }),
+          ...(status && { status }),
+        },
       });
       res.status(200).json({ success: true, data: invoice });
     } catch (err) {

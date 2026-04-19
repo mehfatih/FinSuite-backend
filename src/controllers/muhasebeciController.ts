@@ -28,11 +28,14 @@ export const muhasebeciController = {
       });
 
       // Token'ı maskele — sadece ilk/son 4 karakter göster
-      const safeLinks = links.map(l => ({
-        ...l,
-        accessTokenMasked: `${l.accessToken.slice(0, 4)}...${l.accessToken.slice(-4)}`,
-        accessLink: `${process.env.FRONTEND_URL || "https://finsuite.zyrix.co"}/muhasebeci/${l.accessToken}`,
-      }));
+      const safeLinks = links.map(l => {
+        const { accessToken, ...rest } = l; // raw token'ı response'dan çıkar
+        return {
+          ...rest,
+          accessTokenMasked: `${accessToken.slice(0, 4)}...${accessToken.slice(-4)}`,
+          accessLink: `${process.env.FRONTEND_URL || "https://finsuite.zyrix.co"}/muhasebeci/${accessToken}`,
+        };
+      });
 
       res.status(200).json({ success: true, data: { links: safeLinks } });
     } catch (err) {
