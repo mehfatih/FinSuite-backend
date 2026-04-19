@@ -1,3 +1,7 @@
+import invoicePdfRoutes from './routes/invoicePdfRoutes';
+import otpRoutes from './routes/otpRoutes';
+import teamRoutes from './routes/teamRoutes';
+import campaignRoutes from './routes/campaignRoutes';
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -24,6 +28,7 @@ import aiAssistantRoutes   from "./routes/aiAssistant";
 import muhasebeciRoutes    from "./routes/muhasebeci";
 import factoringRoutes     from "./routes/factoring";
 import customerScoreRoutes from "./routes/customerScore";
+
 // v3
 import stockRoutes         from "./routes/stock";
 import installmentRoutes   from "./routes/installments";
@@ -78,6 +83,11 @@ app.use("/api/recurring",      recurringRoutes);
 app.use("/api/marketplace",    marketplaceRoutes);
 app.use("/api/tax-calendar",   taxCalendarRoutes);
 app.use("/api/benchmark",      benchmarkRoutes);
+// v4
+app.use('/api/invoices', invoicePdfRoutes);
+app.use('/api/auth/otp', otpRoutes);
+app.use('/api/team', teamRoutes);
+app.use('/api/campaigns', campaignRoutes);
 // Public
 app.get("/p/:slug", publicProfileController.viewPublic);
 

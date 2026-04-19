@@ -230,6 +230,7 @@ model Merchant {
   marketplaceOrders MarketplaceOrder[]
   taxEvents         TaxEvent[]
   benchmarkData     BenchmarkSnapshot[]
+  otpCodes          OtpCode[]
 
   @@map("merchants")
 }
@@ -432,36 +433,51 @@ model Commission {
   @@map("commissions")
 }
 
+// ─── CAMPAIGN — تم تحديثه: أضفنا body, discountPercent, startDate, endDate, targetSegment
+// حافظنا على: content, targetTags, openCount, scheduledAt (موجودين في DB)
 model Campaign {
-  id          String         @id @default(uuid())
-  merchantId  String
-  name        String
-  type        String
-  subject     String?
-  content     String?
-  targetTags  String[]
-  status      CampaignStatus @default(DRAFT)
-  sentCount   Int            @default(0)
-  openCount   Int            @default(0)
-  scheduledAt DateTime?
-  sentAt      DateTime?
-  createdAt   DateTime       @default(now())
-  merchant    Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  id              String         @id @default(uuid())
+  merchantId      String
+  name            String
+  type            String
+  subject         String?
+  content         String?        // الحقل القديم — احتفظنا به
+  body            String?        // الحقل الجديد — للـ controller الجديد
+  targetTags      String[]       // الحقل القديم — احتفظنا به
+  targetSegment   String         @default("ALL") // الحقل الجديد
+  discountPercent Float?         // جديد
+  startDate       DateTime?      // جديد
+  endDate         DateTime?      // جديد
+  status          CampaignStatus @default(DRAFT)
+  sentCount       Int            @default(0)
+  openCount       Int            @default(0)
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  merchant        Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@map("campaigns")
 }
 
+// ─── TEAM MEMBER — تم تحديثه: أضفنا status, inviteToken, inviteExpiry
+// passwordHash أصبح optional لأن الأعضاء المدعوين ليس لهم password في البداية
+// حافظنا على: permissions, isActive, lastActiveAt (موجودين في DB)
 model TeamMember {
   id           String    @id @default(uuid())
   merchantId   String
   name         String
   email        String
-  passwordHash String
+  passwordHash String?   // optional — يُعبأ بعد قبول الدعوة
   role         String    @default("MEMBER")
   permissions  Json      @default("{}")
   isActive     Boolean   @default(true)
+  status       String    @default("PENDING") // جديد: PENDING | ACTIVE | DISABLED
+  inviteToken  String?   @unique             // جديد
+  inviteExpiry DateTime?                     // جديد
   lastActiveAt DateTime?
   createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   merchant     Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@unique([merchantId, email])
@@ -472,7 +488,8 @@ model Notification {
   id         String           @id @default(uuid())
   merchantId String
   title      String
-  body       String
+  message    String?
+  body       String?
   type       NotificationType @default(INFO)
   isRead     Boolean          @default(false)
   data       Json?
@@ -515,14 +532,19 @@ model PaymentLink {
   @@map("payment_links")
 }
 
+// ─── OTP CODE — تم إعادة بناؤه بالكامل
+// الـ schema القديم كان مرتبط بـ phone فقط بدون merchantId
+// الآن مرتبط بـ Merchant + يدعم EMAIL و SMS + hash
 model OtpCode {
-  id        String   @id @default(uuid())
-  phone     String
-  code      String
-  expiresAt DateTime
-  attempts  Int      @default(0)
-  verified  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  merchantId String
+  code       String   // مخزن كـ SHA-256 hash
+  channel    String   @default("EMAIL") // EMAIL | SMS
+  expiresAt  DateTime
+  used       Boolean  @default(false)
+  attempts   Int      @default(0)
+  createdAt  DateTime @default(now())
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@map("otp_codes")
 }
