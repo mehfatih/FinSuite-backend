@@ -8,32 +8,107 @@ import { AuthenticatedRequest } from "../types";
 
 const h = (fn: Function): RequestHandler => fn as RequestHandler;
 
-// ── Trendyol API Sandbox ──────────────────────────────────────
+// ── Trendyol Real API ─────────────────────────────────────────
 async function fetchTrendyolOrders(supplierId: string, apiKey: string, apiSecret: string): Promise<any[]> {
-  if (!supplierId || !apiKey) {
+  if (!supplierId || !apiKey || !apiSecret) {
     // Sandbox — demo siparişler döndür
     return [
-      { id: `TY-DEMO-${Date.now()}`, customerFirstName: "Demo", customerLastName: "Müşteri", grossAmount: 299.90, lines: [{ productName: "Ürün A", quantity: 2, price: 149.95 }], orderDate: Date.now(), status: "Created" },
+      {
+        id: `TY-DEMO-${Date.now()}`,
+        orderNumber: `TY2026${Math.floor(Math.random() * 100000)}`,
+        customerFirstName: "Demo",
+        customerLastName: "Müşteri",
+        grossAmount: 299.90,
+        totalDiscount: 0,
+        lines: [
+          { productName: "Demo Ürün A", barcode: "BAR001", quantity: 2, price: 149.95, amount: 299.90 },
+        ],
+        orderDate: Date.now(),
+        status: "Created",
+        shipmentPackages: [],
+      },
     ];
   }
+
   try {
-    const creds = Buffer.from(`${supplierId}:${apiKey}:${apiSecret}`).toString("base64");
-    const res = await fetch(`https://api.trendyol.com/sapigw/suppliers/${supplierId}/orders?status=Created&size=50`, {
-      headers: { "Authorization": `Basic ${creds}`, "User-Agent": `${supplierId} - ZyrixFinSuite` },
+    // Trendyol Partner API v2
+    const credentials = Buffer.from(`${supplierId}:${apiKey}:${apiSecret}`).toString("base64");
+
+    // Son 7 günün siparişleri
+    const endDate   = Date.now();
+    const startDate = endDate - 7 * 24 * 60 * 60 * 1000;
+
+    const params = new URLSearchParams({
+      startDate: String(startDate),
+      endDate:   String(endDate),
+      page:      "0",
+      size:      "50",
+      status:    "Created",
     });
-    if (!res.ok) return [];
-    const data = await res.json();
+
+    const response = await fetch(
+      `https://api.trendyol.com/sapigw/suppliers/${supplierId}/orders?${params}`,
+      {
+        headers: {
+          "Authorization": `Basic ${credentials}`,
+          "User-Agent":    `${supplierId} - ZyrixFinSuite/3.0`,
+          "Content-Type":  "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[Trendyol] API ${response.status}:`, errText);
+      return [];
+    }
+
+    const data = await response.json();
     return data?.content || [];
-  } catch { return []; }
+  } catch (err) {
+    console.error("[Trendyol] Fetch error:", err);
+    return [];
+  }
 }
 
-async function fetchHepsiburadaOrders(apiKey: string): Promise<any[]> {
-  if (!apiKey) {
+// ── Hepsiburada Real API ──────────────────────────────────────
+async function fetchHepsiburadaOrders(apiKey: string, apiSecret?: string): Promise<any[]> {
+  if (!apiKey || !apiSecret) {
+    // Sandbox — demo siparişler döndür
     return [
-      { id: `HB-DEMO-${Date.now()}`, customerName: "Demo HB", totalPrice: 459.00, lines: [{ name: "Ürün B", quantity: 1, price: 459.00 }], orderDate: new Date().toISOString(), status: "New" },
+      {
+        id: `HB-DEMO-${Date.now()}`,
+        orderNumber: `HB2026${Math.floor(Math.random() * 100000)}`,
+        customerName: "Demo HB Müşteri",
+        totalPrice: 459.00,
+        lines: [{ name: "Demo Ürün B", quantity: 1, price: 459.00 }],
+        orderDate: new Date().toISOString(),
+        status: "New",
+      },
     ];
   }
-  return [];
+
+  try {
+    const credentials = Buffer.from(`${apiKey}:${apiSecret}`).toString("base64");
+
+    const response = await fetch(
+      "https://listing-external.hepsiburada.com/listings/merchantlisting/allorders",
+      {
+        headers: {
+          "Authorization": `Basic ${credentials}`,
+          "Content-Type":  "application/json",
+          "Accept":        "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data?.items || data?.orders || [];
+  } catch (err) {
+    console.error("[Hepsiburada] Fetch error:", err);
+    return [];
+  }
 }
 
 export const marketplaceController = {
@@ -75,37 +150,72 @@ export const marketplaceController = {
 
       let rawOrders: any[] = [];
       if (channel === "TRENDYOL") {
-        rawOrders = await fetchTrendyolOrders(integration?.supplierId || "", integration?.apiKey || "", integration?.apiSecret || "");
+        rawOrders = await fetchTrendyolOrders(
+          integration?.supplierId || "",
+          integration?.apiKey    || "",
+          integration?.apiSecret || ""
+        );
       } else if (channel === "HEPSIBURADA") {
-        rawOrders = await fetchHepsiburadaOrders(integration?.apiKey || "");
+        rawOrders = await fetchHepsiburadaOrders(
+          integration?.apiKey    || "",
+          integration?.apiSecret || ""
+        );
       }
 
       let created = 0, updated = 0;
       for (const o of rawOrders) {
-        const externalId = String(o.id || o.orderNumber);
-        const total = o.grossAmount || o.totalPrice || 0;
-        const customerName = o.customerFirstName ? `${o.customerFirstName} ${o.customerLastName}` : o.customerName || "Bilinmiyor";
-        const items = o.lines?.map((l: any) => ({ name: l.productName || l.name, quantity: l.quantity, price: l.price })) || [];
-        const commission = total * 0.15; // ~%15 komisyon tahmini
+        const externalId    = String(o.id || o.orderNumber);
+        const total         = o.grossAmount || o.totalPrice || 0;
+        const customerName  = o.customerFirstName
+          ? `${o.customerFirstName} ${o.customerLastName}`
+          : o.customerName || "Bilinmiyor";
+        const items         = o.lines?.map((l: any) => ({
+          name: l.productName || l.name,
+          quantity: l.quantity,
+          price: l.price,
+        })) || [];
+        const commission    = total * 0.15;
 
         const existing = await prisma.marketplaceOrder.findUnique({
           where: { merchantId_channel_externalOrderId: { merchantId, channel: channel as any, externalOrderId: externalId } },
         });
 
         if (existing) {
-          await prisma.marketplaceOrder.update({ where: { id: existing.id }, data: { status: o.status, syncedAt: new Date() } });
+          await prisma.marketplaceOrder.update({
+            where: { id: existing.id },
+            data:  { status: o.status, syncedAt: new Date() },
+          });
           updated++;
         } else {
           await prisma.marketplaceOrder.create({
-            data: { merchantId, channel: channel as any, externalOrderId: externalId, customerName, items, subtotal: total - commission, commission, shippingCost: 0, total, status: o.status || "NEW", orderDate: new Date(o.orderDate) },
+            data: {
+              merchantId, channel: channel as any,
+              externalOrderId: externalId,
+              customerName, items,
+              subtotal:     total - commission,
+              commission,
+              shippingCost: 0,
+              total,
+              status:    o.status || "NEW",
+              orderDate: new Date(o.orderDate),
+            },
           });
           created++;
         }
       }
 
-      if (integration) await prisma.marketplaceIntegration.update({ where: { id: integration.id }, data: { lastSyncAt: new Date() } });
+      if (integration) {
+        await prisma.marketplaceIntegration.update({
+          where: { id: integration.id },
+          data:  { lastSyncAt: new Date() },
+        });
+      }
 
-      res.json({ success: true, data: { created, updated, total: rawOrders.length }, message: `${channel}: ${created} yeni, ${updated} güncellendi` });
+      res.json({
+        success: true,
+        data:    { created, updated, total: rawOrders.length },
+        message: `${channel}: ${created} yeni, ${updated} güncellendi`,
+      });
     } catch { res.status(500).json({ success: false, error: "Senkronizasyon başarısız" }); }
   }),
 
@@ -116,7 +226,7 @@ export const marketplaceController = {
       if (!channel) return res.status(400).json({ success: false, error: "Kanal zorunlu" });
 
       const integration = await prisma.marketplaceIntegration.upsert({
-        where: { merchantId_channel: { merchantId: req.merchant!.id, channel } },
+        where:  { merchantId_channel: { merchantId: req.merchant!.id, channel } },
         create: { merchantId: req.merchant!.id, channel, apiKey, apiSecret, supplierId },
         update: { apiKey, apiSecret, supplierId, isActive: true },
       });
@@ -127,9 +237,14 @@ export const marketplaceController = {
   // ── GET /api/marketplace/integrations
   listIntegrations: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const integrations = await prisma.marketplaceIntegration.findMany({ where: { merchantId: req.merchant!.id } });
-      // API key'leri maskele
-      const safe = integrations.map(i => ({ ...i, apiKey: i.apiKey ? `${i.apiKey.slice(0,4)}...` : null, apiSecret: i.apiSecret ? "***" : null }));
+      const integrations = await prisma.marketplaceIntegration.findMany({
+        where: { merchantId: req.merchant!.id },
+      });
+      const safe = integrations.map(i => ({
+        ...i,
+        apiKey:    i.apiKey    ? `${i.apiKey.slice(0, 4)}...`    : null,
+        apiSecret: i.apiSecret ? "***" : null,
+      }));
       res.json({ success: true, data: safe });
     } catch { res.status(500).json({ success: false, error: "Entegrasyonlar alınamadı" }); }
   }),
@@ -137,24 +252,38 @@ export const marketplaceController = {
   // ── POST /api/marketplace/orders/:id/create-invoice — sipariş → fatura
   createInvoice: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const order = await prisma.marketplaceOrder.findFirst({ where: { id: req.params.id, merchantId: req.merchant!.id } });
+      const order = await prisma.marketplaceOrder.findFirst({
+        where: { id: req.params.id, merchantId: req.merchant!.id },
+      });
       if (!order) return res.status(404).json({ success: false, error: "Sipariş bulunamadı" });
       if (order.invoiceId) return res.status(409).json({ success: false, error: "Bu sipariş için zaten fatura var" });
 
-      const count = await prisma.invoice.count({ where: { merchantId: req.merchant!.id } });
+      const count         = await prisma.invoice.count({ where: { merchantId: req.merchant!.id } });
       const invoiceNumber = `MKT-${new Date().getFullYear()}-${String(count + 1).padStart(4, "0")}`;
-      const vatAmount = Number(order.subtotal) * 0.20;
+      const vatAmount     = Number(order.subtotal) * 0.20;
 
       const invoice = await prisma.invoice.create({
         data: {
-          merchantId: req.merchant!.id, invoiceNumber, customerName: order.customerName,
-          items: order.items, subtotal: order.subtotal, vatRate: 20, vatAmount,
-          total: Number(order.subtotal) + vatAmount, currency: order.currency,
-          status: "SENT", dueDate: new Date(Date.now() + 30 * 86400000),
-          notes: `${order.channel} Sipariş: ${order.externalOrderId}`,
+          merchantId:   req.merchant!.id,
+          invoiceNumber,
+          customerName: order.customerName,
+          items:        order.items,
+          subtotal:     order.subtotal,
+          vatRate:      20,
+          vatAmount,
+          total:        Number(order.subtotal) + vatAmount,
+          currency:     order.currency,
+          status:       "SENT",
+          dueDate:      new Date(Date.now() + 30 * 86400000),
+          notes:        `${order.channel} Sipariş: ${order.externalOrderId}`,
         },
       });
-      await prisma.marketplaceOrder.update({ where: { id: order.id }, data: { invoiceId: invoice.id } });
+
+      await prisma.marketplaceOrder.update({
+        where: { id: order.id },
+        data:  { invoiceId: invoice.id },
+      });
+
       res.json({ success: true, data: invoice });
     } catch { res.status(500).json({ success: false, error: "Fatura oluşturulamadı" }); }
   }),
