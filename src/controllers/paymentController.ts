@@ -1,6 +1,6 @@
 // ================================================================
-// Zyrix FinSuite — iyzico Payment Controller (Production Ready)
-// Sandbox + Production mode — auto-switches based on env vars
+// Zyrix FinSuite — Payment Controller (Production Ready)
+// getPlans + getSubscription + initiate + iyzico Sandbox/Production
 // ================================================================
 import { Request, Response, RequestHandler } from 'express';
 import { PrismaClient } from '@prisma/client';
@@ -14,149 +14,164 @@ function getIyzicoConfig() {
   const apiKey    = process.env.IYZICO_API_KEY;
   const secretKey = process.env.IYZICO_SECRET_KEY;
   const baseUrl   = process.env.IYZICO_BASE_URL || 'https://sandbox.iyzipay.com';
-
-  if (!apiKey || !secretKey) {
-    throw new Error('IYZICO_API_KEY ve IYZICO_SECRET_KEY eksik — Railway Variables kontrol edin');
-  }
-
+  if (!apiKey || !secretKey) return null;
   const Iyzipay = require('iyzipay');
   return new Iyzipay({ apiKey, secretKey, uri: baseUrl });
 }
 
 const isProduction = process.env.IYZICO_BASE_URL === 'https://api.iyzipay.com';
 
-// ── POST /api/payments/initialize — Ödeme başlat ──────────────
-export const initializePayment = h(async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const iyzipay = getIyzicoConfig();
-    const merchant = (req as any).merchant;
-    const {
-      price, paidPrice, currency = 'TRY',
-      installment = 1, paymentCard,
-      buyer, shippingAddress, billingAddress,
-      basketItems, callbackUrl, invoiceId,
-    } = req.body;
+// ── Plan Definitions ──────────────────────────────────────────
+const PLANS = [
+  {
+    id: 'STARTER', name: 'Starter', price: 0, currency: 'TRY', interval: 'MONTHLY',
+    features: ['5 fatura/ay', '50 müşteri', 'Temel CRM', 'E-Fatura (sandbox)'],
+    recommended: false,
+  },
+  {
+    id: 'BUSINESS', name: 'Business', price: 299, currency: 'TRY', interval: 'MONTHLY',
+    features: ['Sınırsız fatura', '500 müşteri', 'AI Asistan', 'Stok yönetimi', 'WhatsApp', 'Taksit takibi'],
+    recommended: true,
+  },
+  {
+    id: 'PRO', name: 'Pro', price: 599, currency: 'TRY', interval: 'MONTHLY',
+    features: ['Sınırsız her şey', 'E-Fatura (GİB)', 'Pazar Yeri', 'Muhasebeci erişimi', 'Ekip üyeleri', 'Benchmark'],
+    recommended: false,
+  },
+  {
+    id: 'ENTERPRISE', name: 'Enterprise', price: 0, currency: 'TRY', interval: 'MONTHLY',
+    features: ["Pro'nun tümü", 'Özel entegrasyonlar', 'Dedicated destek', 'SLA garantisi'],
+    recommended: false, contactSales: true,
+  },
+];
 
-    if (!price || !paymentCard || !buyer) {
-      return res.status(400).json({ success: false, error: 'Fiyat, kart bilgileri ve alıcı zorunlu' });
+// ── GET /api/payments/plans ────────────────────────────────────
+export const getPlans = h(async (_req: Request, res: Response) => {
+  res.json({
+    success: true,
+    data: { plans: PLANS, paymentMode: isProduction ? 'production' : 'sandbox', currency: 'TRY' },
+  });
+});
+
+// ── GET /api/payments/subscription ────────────────────────────
+export const getSubscription = h(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const merchantId = req.merchant!.id;
+
+    const subscription = await prisma.subscription.findFirst({
+      where: { merchantId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const merchant = await prisma.merchant.findUnique({
+      where: { id: merchantId },
+      select: { plan: true, status: true, trialEndsAt: true },
+    });
+
+    if (!subscription) {
+      return res.json({
+        success: true,
+        data: {
+          plan: merchant?.plan || 'STARTER',
+          status: 'TRIAL',
+          trialEndsAt: merchant?.trialEndsAt,
+          currentPeriodEnd: null,
+          isTrial: true,
+        },
+      });
     }
 
-    const request = {
-      locale: 'tr',
-      conversationId: `${merchant.id}-${Date.now()}`,
-      price: String(price),
-      paidPrice: String(paidPrice || price),
-      currency,
-      installment: String(installment),
-      basketId: invoiceId || `basket-${Date.now()}`,
-      paymentChannel: 'WEB',
-      paymentGroup: 'PRODUCT',
-      paymentCard: {
-        cardHolderName: paymentCard.cardHolderName,
-        cardNumber:     paymentCard.cardNumber,
-        expireMonth:    paymentCard.expireMonth,
-        expireYear:     paymentCard.expireYear,
-        cvc:            paymentCard.cvc,
-        registerCard:   paymentCard.registerCard || '0',
+    const currentPlan = PLANS.find(p => p.id === subscription.planName) || PLANS[0];
+
+    res.json({
+      success: true,
+      data: {
+        id:                 subscription.id,
+        plan:               subscription.planName,
+        planDetails:        currentPlan,
+        status:             subscription.status,
+        interval:           subscription.interval,
+        amount:             Number(subscription.amount),
+        currency:           subscription.currency,
+        currentPeriodStart: subscription.currentPeriodStart,
+        currentPeriodEnd:   subscription.currentPeriodEnd,
+        cancelledAt:        subscription.cancelledAt,
+        isTrial:            subscription.status === 'TRIAL',
+        trialEndsAt:        merchant?.trialEndsAt,
+        merchantStatus:     merchant?.status,
       },
-      buyer: {
-        id:                  buyer.id || merchant.id,
-        name:                buyer.name || merchant.name,
-        surname:             buyer.surname || '',
-        gsmNumber:           buyer.gsmNumber || merchant.phone,
-        email:               buyer.email || merchant.email,
-        identityNumber:      buyer.identityNumber || '11111111111',
-        registrationAddress: buyer.registrationAddress || 'Türkiye',
-        ip:                  req.ip || '85.34.78.112',
-        city:                buyer.city || 'Istanbul',
-        country:             buyer.country || 'Turkey',
-      },
-      shippingAddress: shippingAddress || {
-        contactName: buyer.name || merchant.name,
-        city: 'Istanbul', country: 'Turkey',
-        address: 'Türkiye',
-      },
-      billingAddress: billingAddress || {
-        contactName: buyer.name || merchant.name,
-        city: 'Istanbul', country: 'Turkey',
-        address: 'Türkiye',
-      },
-      basketItems: basketItems || [{
-        id:       invoiceId || 'item-1',
-        name:     'Zyrix FinSuite Ödemesi',
-        category1:'Abonelik',
-        itemType: 'VIRTUAL',
-        price:    String(price),
-      }],
-    };
-
-    iyzipay.payment.create(request, async (err: any, result: any) => {
-      if (err) {
-        console.error('[iyzico] Payment error:', err);
-        return res.status(500).json({ success: false, error: 'Ödeme başlatılamadı', detail: err.message });
-      }
-
-      if (result.status === 'success') {
-        // Log başarılı ödeme
-        console.log(`[iyzico] Payment success: ${result.paymentId} — ${price} ${currency}`);
-
-        // Fatura varsa ödendi olarak işaretle
-        if (invoiceId) {
-          await prisma.invoice.updateMany({
-            where: { id: invoiceId, merchantId: merchant.id },
-            data: { status: 'PAID', paidDate: new Date() },
-          }).catch(console.error);
-        }
-
-        return res.json({
-          success: true,
-          data: {
-            paymentId:      result.paymentId,
-            conversationId: result.conversationId,
-            status:         result.status,
-            fraudStatus:    result.fraudStatus,
-            price:          result.price,
-            paidPrice:      result.paidPrice,
-            currency:       result.currency,
-            installment:    result.installment,
-            mode:           isProduction ? 'production' : 'sandbox',
-          },
-          message: 'Ödeme başarılı',
-        });
-      }
-
-      // Başarısız
-      console.error('[iyzico] Payment failed:', result.errorMessage);
-      return res.status(400).json({
-        success: false,
-        error: result.errorMessage || 'Ödeme başarısız',
-        errorCode: result.errorCode,
-        errorGroup: result.errorGroup,
-      });
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message || 'Ödeme hatası' });
+  } catch {
+    res.status(500).json({ success: false, error: 'Abonelik bilgisi alınamadı' });
   }
 });
 
-// ── POST /api/payments/3ds/initialize — 3D Secure ─────────────
-export const initialize3DS = h(async (req: AuthenticatedRequest, res: Response) => {
+// ── POST /api/payments/initiate ────────────────────────────────
+export const initiate = h(async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const merchant = req.merchant!;
+    const { planId, paymentCard, interval = 'MONTHLY' } = req.body;
+
+    if (!planId) return res.status(400).json({ success: false, error: 'Plan seçimi zorunlu' });
+
+    const plan = PLANS.find(p => p.id === planId);
+    if (!plan) return res.status(400).json({ success: false, error: 'Geçersiz plan' });
+
+    // ── Ücretsiz plan ─────────────────────────────────────────
+    if (plan.price === 0) {
+      const periodEnd = new Date();
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+      await prisma.subscription.create({
+        data: {
+          merchantId: merchant.id, planName: planId as any, amount: 0,
+          currency: 'TRY', interval: interval as any, status: 'ACTIVE',
+          currentPeriodStart: new Date(), currentPeriodEnd: periodEnd,
+        },
+      });
+      await prisma.merchant.update({ where: { id: merchant.id }, data: { plan: planId as any, status: 'ACTIVE' } });
+
+      return res.json({
+        success: true,
+        data: { plan: planId, status: 'ACTIVE', amount: 0 },
+        message: `${plan.name} planına geçildi`,
+      });
+    }
+
+    // ── Sandbox mod (credentials yok) ─────────────────────────
     const iyzipay = getIyzicoConfig();
-    const merchant = (req as any).merchant;
-    const { price, paymentCard, buyer, basketItems, callbackUrl, invoiceId } = req.body;
+    if (!iyzipay) {
+      console.log(`[Payment] Sandbox — simulating ${planId} for ${merchant.email}`);
+      const periodEnd = new Date();
+      if (interval === 'YEARLY') periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+      else periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+      await prisma.subscription.create({
+        data: {
+          merchantId: merchant.id, planName: planId as any, amount: plan.price,
+          currency: 'TRY', interval: interval as any, status: 'ACTIVE',
+          currentPeriodStart: new Date(), currentPeriodEnd: periodEnd,
+        },
+      });
+      await prisma.merchant.update({ where: { id: merchant.id }, data: { plan: planId as any, status: 'ACTIVE' } });
+
+      return res.json({
+        success: true,
+        data: { plan: planId, status: 'ACTIVE', amount: plan.price, mode: 'sandbox' },
+        message: `${plan.name} planı aktif edildi (sandbox — IYZICO_API_KEY eklenince gerçek ödeme alınır)`,
+      });
+    }
+
+    // ── Gerçek iyzico ödemesi ─────────────────────────────────
+    if (!paymentCard) return res.status(400).json({ success: false, error: 'Kart bilgileri zorunlu' });
 
     const request = {
       locale: 'tr',
-      conversationId: `3ds-${merchant.id}-${Date.now()}`,
-      price: String(price),
-      paidPrice: String(price),
-      currency: 'TRY',
-      installment: '1',
-      basketId: invoiceId || `basket-${Date.now()}`,
-      paymentChannel: 'WEB',
-      paymentGroup: 'PRODUCT',
-      callbackUrl: callbackUrl || `${process.env.FRONTEND_URL || 'https://finsuite.zyrix.co'}/payment/callback`,
+      conversationId: `sub-${merchant.id}-${Date.now()}`,
+      price: String(plan.price), paidPrice: String(plan.price),
+      currency: 'TRY', installment: '1',
+      basketId: `plan-${planId}-${Date.now()}`,
+      paymentChannel: 'WEB', paymentGroup: 'SUBSCRIPTION',
       paymentCard: {
         cardHolderName: paymentCard.cardHolderName,
         cardNumber:     paymentCard.cardNumber,
@@ -166,91 +181,58 @@ export const initialize3DS = h(async (req: AuthenticatedRequest, res: Response) 
         registerCard:   '0',
       },
       buyer: {
-        id:                  merchant.id,
-        name:                buyer?.name || merchant.name,
-        surname:             buyer?.surname || '',
-        gsmNumber:           merchant.phone,
-        email:               merchant.email,
-        identityNumber:      buyer?.identityNumber || '11111111111',
-        registrationAddress: 'Türkiye',
-        ip:                  req.ip || '85.34.78.112',
-        city:                'Istanbul',
-        country:             'Turkey',
+        id: merchant.id, name: merchant.name, surname: '',
+        gsmNumber: merchant.phone, email: merchant.email,
+        identityNumber: '11111111111', registrationAddress: 'Türkiye',
+        ip: req.ip || '85.34.78.112', city: 'Istanbul', country: 'Turkey',
       },
       shippingAddress: { contactName: merchant.name, city: 'Istanbul', country: 'Turkey', address: 'Türkiye' },
       billingAddress:  { contactName: merchant.name, city: 'Istanbul', country: 'Turkey', address: 'Türkiye' },
-      basketItems: basketItems || [{ id: 'item-1', name: 'Ödeme', category1: 'Hizmet', itemType: 'VIRTUAL', price: String(price) }],
+      basketItems: [{
+        id: `plan-${planId}`, name: `Zyrix FinSuite ${plan.name} Abonelik`,
+        category1: 'Abonelik', itemType: 'VIRTUAL', price: String(plan.price),
+      }],
     };
 
-    iyzipay.threedsInitialize.create(request, (err: any, result: any) => {
-      if (err) return res.status(500).json({ success: false, error: err.message });
+    iyzipay.payment.create(request, async (err: any, result: any) => {
+      if (err) {
+        console.error('[iyzico] Payment error:', err);
+        return res.status(500).json({ success: false, error: 'Ödeme başlatılamadı' });
+      }
 
       if (result.status === 'success') {
-        // 3DS HTML sayfası döndür — müşteri bu sayfaya yönlendirilmeli
-        return res.json({ success: true, data: { htmlContent: result.threeDSHtmlContent, conversationId: result.conversationId } });
+        const periodEnd = new Date();
+        if (interval === 'YEARLY') periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+        else periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+        await prisma.subscription.create({
+          data: {
+            merchantId: merchant.id, planName: planId as any, amount: plan.price,
+            currency: 'TRY', interval: interval as any, status: 'ACTIVE',
+            currentPeriodStart: new Date(), currentPeriodEnd: periodEnd,
+          },
+        });
+        await prisma.merchant.update({ where: { id: merchant.id }, data: { plan: planId as any, status: 'ACTIVE' } });
+
+        return res.json({
+          success: true,
+          data: { paymentId: result.paymentId, plan: planId, status: 'ACTIVE', amount: plan.price, periodEnd, mode: isProduction ? 'production' : 'sandbox' },
+          message: `${plan.name} planı aktif edildi`,
+        });
       }
 
-      res.status(400).json({ success: false, error: result.errorMessage });
+      return res.status(400).json({ success: false, error: result.errorMessage || 'Ödeme başarısız', errorCode: result.errorCode });
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+
+  } catch (err) {
+    console.error('[Payment initiate]', err);
+    res.status(500).json({ success: false, error: 'Ödeme hatası' });
   }
 });
 
-// ── POST /api/payments/3ds/callback — 3D Secure callback ──────
-export const callback3DS = h(async (req: Request, res: Response) => {
-  try {
-    const iyzipay = getIyzicoConfig();
-    const { conversationId, mdStatus, paymentId } = req.body;
-
-    iyzipay.threedsPayment.create({ locale: 'tr', conversationId, paymentId }, (err: any, result: any) => {
-      const frontendUrl = process.env.FRONTEND_URL || 'https://finsuite.zyrix.co';
-
-      if (err || result.status !== 'success') {
-        return res.redirect(`${frontendUrl}/payment/failed?error=${encodeURIComponent(result?.errorMessage || 'Ödeme başarısız')}`);
-      }
-
-      res.redirect(`${frontendUrl}/payment/success?paymentId=${result.paymentId}`);
-    });
-  } catch (err: any) {
-    res.redirect(`${process.env.FRONTEND_URL || 'https://finsuite.zyrix.co'}/payment/failed?error=server_error`);
-  }
-});
-
-// ── GET /api/payments/installments — Taksit seçenekleri ───────
-export const getInstallmentOptions = h(async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const iyzipay = getIyzicoConfig();
-    const { binNumber, price } = req.query;
-
-    if (!binNumber || !price) {
-      return res.status(400).json({ success: false, error: 'binNumber ve price zorunlu' });
-    }
-
-    iyzipay.installmentInfo.retrieve(
-      { locale: 'tr', binNumber: String(binNumber), price: String(price) },
-      (err: any, result: any) => {
-        if (err || result.status !== 'success') {
-          return res.status(400).json({ success: false, error: result?.errorMessage || 'Taksit bilgisi alınamadı' });
-        }
-
-        res.json({ success: true, data: result.installmentDetails });
-      }
-    );
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ── GET /api/payments/status — iyzico bağlantı durumu ─────────
-export const getPaymentStatus = h(async (_req: Request, res: Response) => {
-  const configured = !!(process.env.IYZICO_API_KEY && process.env.IYZICO_SECRET_KEY);
-  res.json({
-    success: true,
-    data: {
-      configured,
-      mode: isProduction ? 'production' : 'sandbox',
-      baseUrl: process.env.IYZICO_BASE_URL || 'https://sandbox.iyzipay.com',
-    },
-  });
-});
+// ── Export ────────────────────────────────────────────────────
+export const paymentController = {
+  getPlans,
+  getSubscription,
+  initiate,
+};
