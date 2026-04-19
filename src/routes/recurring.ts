@@ -1,5 +1,14 @@
-import { Router } from 'express';
-const router = Router();
-router.get('/', (_req, res) => res.json({ success: true, data: [] }));
-export default router;
+import { Router } from "express";
+import { recurringController } from "../controllers/recurringController";
+import { authenticate } from "../middleware/auth";
 
+const router = Router();
+router.use(authenticate as any);
+
+router.get("/",              recurringController.list);
+router.post("/",             recurringController.create);
+router.post("/process-due",  recurringController.processDue);
+router.patch("/:id",         recurringController.update);
+router.post("/:id/run",      recurringController.runNow);
+
+export default router;

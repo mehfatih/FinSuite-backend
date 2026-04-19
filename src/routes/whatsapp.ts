@@ -1,5 +1,14 @@
-import { Router } from 'express';
-const router = Router();
-router.get('/', (_req, res) => res.json({ success: true, data: [] }));
-export default router;
+import { Router } from "express";
+import { whatsappController } from "../controllers/whatsappController";
+import { authenticate } from "../middleware/auth";
 
+const router = Router();
+router.use(authenticate as any);
+
+router.get("/status",                    whatsappController.status);
+router.post("/send-invoice/:invoiceId",  whatsappController.sendInvoice);
+router.post("/remind/:invoiceId",        whatsappController.sendReminder);
+router.post("/bulk-remind",              whatsappController.bulkRemind);
+router.post("/custom",                   whatsappController.sendCustom);
+
+export default router;
