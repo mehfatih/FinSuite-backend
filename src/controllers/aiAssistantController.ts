@@ -157,7 +157,7 @@ export const aiAssistantController = {
       });
     } catch (err) {
       console.error("[AI Assistant chat]", err);
-      res.status(500).json({ success: false, error: "AI yanıt veremedì" });
+      res.status(500).json({ success: false, error: "AI yanıt veremedi" });
     }
   }),
 

@@ -69,7 +69,11 @@ export const stockController = {
     try {
       const existing = await prisma.stockItem.findFirst({ where: { id: req.params.id, merchantId: req.merchant!.id } });
       if (!existing) return res.status(404).json({ success: false, error: "Ürün bulunamadı" });
-      const item = await prisma.stockItem.update({ where: { id: req.params.id }, data: req.body });
+      const { name, sku, barcode, category, unit, quantity, minQuantity, costPrice, salePrice, vatRate, location, description, isActive } = req.body;
+      const item = await prisma.stockItem.update({
+        where: { id: req.params.id },
+        data: { ...(name && { name }), ...(sku !== undefined && { sku }), ...(barcode !== undefined && { barcode }), ...(category !== undefined && { category }), ...(unit && { unit }), ...(quantity !== undefined && { quantity }), ...(minQuantity !== undefined && { minQuantity }), ...(costPrice !== undefined && { costPrice }), ...(salePrice !== undefined && { salePrice }), ...(vatRate !== undefined && { vatRate }), ...(location !== undefined && { location }), ...(description !== undefined && { description }), ...(isActive !== undefined && { isActive }) },
+      });
       res.json({ success: true, data: item });
     } catch { res.status(500).json({ success: false, error: "Güncelleme başarısız" }); }
   }),

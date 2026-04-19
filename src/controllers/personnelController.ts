@@ -101,7 +101,11 @@ export const personnelController = {
     try {
       const existing = await prisma.personnel.findFirst({ where: { id: req.params.id, merchantId: req.merchant!.id } });
       if (!existing) return res.status(404).json({ success: false, error: "Personel bulunamadı" });
-      const updated = await prisma.personnel.update({ where: { id: req.params.id }, data: req.body });
+      const { name, tcKimlik, email, phone, position, department, startDate, grossSalary, sgkNo, ibanNo, notes, status, endDate } = req.body;
+      const updated = await prisma.personnel.update({
+        where: { id: req.params.id },
+        data: { ...(name && { name }), ...(tcKimlik !== undefined && { tcKimlik }), ...(email !== undefined && { email }), ...(phone !== undefined && { phone }), ...(position !== undefined && { position }), ...(department !== undefined && { department }), ...(startDate && { startDate: new Date(startDate) }), ...(grossSalary !== undefined && { grossSalary }), ...(sgkNo !== undefined && { sgkNo }), ...(ibanNo !== undefined && { ibanNo }), ...(notes !== undefined && { notes }), ...(status && { status }), ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }) },
+      });
       res.json({ success: true, data: updated });
     } catch { res.status(500).json({ success: false, error: "Güncelleme başarısız" }); }
   }),
