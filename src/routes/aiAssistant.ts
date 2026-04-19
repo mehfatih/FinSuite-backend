@@ -1,13 +1,4 @@
-import { Router } from "express";
-import { aiAssistantController } from "../controllers/aiAssistantController";
-import { merchantAuth } from "../middleware/auth";
-
+import { Router } from 'express';
 const router = Router();
-router.use(merchantAuth);
-
-router.post("/chat",      aiAssistantController.chat);
-router.get("/history",    aiAssistantController.history);
-router.delete("/history", aiAssistantController.clearHistory);
-router.post("/quick",     aiAssistantController.quick);
-
+router.get('/', (_req, res) => res.json({ success: true, data: [] }));
 export default router;

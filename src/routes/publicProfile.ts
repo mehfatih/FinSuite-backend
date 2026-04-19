@@ -1,9 +1,4 @@
-import { Router } from "express";
-import { publicProfileController } from "../controllers/publicProfileController";
-import { merchantAuth } from "../middleware/auth";
+import { Router } from 'express';
 const router = Router();
-router.use(merchantAuth);
-router.get("/", publicProfileController.get);
-router.post("/", publicProfileController.upsert);
-router.get("/qr", publicProfileController.qr);
+router.get('/', (_req, res) => res.json({ success: true, data: [] }));
 export default router;

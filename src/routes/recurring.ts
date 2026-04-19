@@ -1,11 +1,4 @@
-import { Router } from "express";
-import { recurringController } from "../controllers/recurringController";
-import { merchantAuth } from "../middleware/auth";
+import { Router } from 'express';
 const router = Router();
-router.use(merchantAuth);
-router.get("/", recurringController.list);
-router.post("/", recurringController.create);
-router.post("/process-due", recurringController.processDue);
-router.patch("/:id", recurringController.update);
-router.post("/:id/run", recurringController.runNow);
+router.get('/', (_req, res) => res.json({ success: true, data: [] }));
 export default router;

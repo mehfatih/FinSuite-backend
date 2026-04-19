@@ -1,12 +1,4 @@
-import { Router } from "express";
-import { customerScoreController } from "../controllers/customerScoreController";
-import { merchantAuth } from "../middleware/auth";
-
+import { Router } from 'express';
 const router = Router();
-router.use(merchantAuth);
-
-router.post("/batch",        customerScoreController.scoreAll);
-router.get("/summary",       customerScoreController.summary);
-router.post("/:customerId",  customerScoreController.scoreCustomer);
-
+router.get('/', (_req, res) => res.json({ success: true, data: [] }));
 export default router;

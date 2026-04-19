@@ -1,10 +1,4 @@
-import { Router } from "express";
-import { taxCalendarController } from "../controllers/taxCalendarController";
-import { merchantAuth } from "../middleware/auth";
+import { Router } from 'express';
 const router = Router();
-router.use(merchantAuth);
-router.get("/upcoming", taxCalendarController.upcoming);
-router.get("/", taxCalendarController.list);
-router.post("/generate", taxCalendarController.generate);
-router.patch("/:id", taxCalendarController.updateStatus);
+router.get('/', (_req, res) => res.json({ success: true, data: [] }));
 export default router;

@@ -1,10 +1,4 @@
-import { Router } from "express";
-import { installmentController } from "../controllers/installmentController";
-import { merchantAuth } from "../middleware/auth";
+import { Router } from 'express';
 const router = Router();
-router.use(merchantAuth);
-router.get("/upcoming", installmentController.upcoming);
-router.get("/", installmentController.list);
-router.post("/", installmentController.create);
-router.post("/:installmentId/pay", installmentController.payInstallment);
+router.get('/', (_req, res) => res.json({ success: true, data: [] }));
 export default router;

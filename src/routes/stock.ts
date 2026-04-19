@@ -1,12 +1,4 @@
-import { Router } from "express";
-import { stockController } from "../controllers/stockController";
-import { merchantAuth } from "../middleware/auth";
+import { Router } from 'express';
 const router = Router();
-router.use(merchantAuth);
-router.get("/summary", stockController.summary);
-router.get("/", stockController.list);
-router.get("/:id", stockController.getById);
-router.post("/", stockController.create);
-router.put("/:id", stockController.update);
-router.post("/:id/movement", stockController.addMovement);
+router.get('/', (_req, res) => res.json({ success: true, data: [] }));
 export default router;
