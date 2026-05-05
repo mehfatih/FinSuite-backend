@@ -1,0 +1,28 @@
+# ============================================================
+# Zyrix FinSuite Backend - Nixpacks override
+#
+# Goal: Cut deploy time from ~17min to ~2-3min by stopping
+# Nixpacks from auto-installing chromium + 12 GUI libs via apt.
+#
+# puppeteer (used only by invoicePdfController.ts) ships its own
+# chromium binary via npm during install - that takes ~30s instead
+# of 17 minutes.
+# ============================================================
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm-9_x", "openssl"]
+aptPkgs = []
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm install && npx prisma generate"]
+
+[start]
+cmd = "npx tsx src/index.ts"
+
+[variables]
+# Tell puppeteer to download its own chromium (small, fast)
+# instead of relying on a system package
+PUPPETEER_SKIP_DOWNLOAD = "false"
