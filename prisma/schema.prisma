@@ -152,6 +152,30 @@ enum BankTxnDirection {
   OUT
 }
 
+enum CashCrisisSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CashCrisisType {
+  NEGATIVE_TREND
+  OVERDUE_AR
+  TAX_DUE
+  PAYROLL_RISK
+  BURN_RATE
+  INVOICE_GAP
+  EXPENSE_SPIKE
+}
+
+enum CashCrisisStatus {
+  ACTIVE
+  DISMISSED
+  RESOLVED
+  EXPIRED
+}
+
 enum ReceiptScanStatus {
   PENDING
   PROCESSING
@@ -275,6 +299,7 @@ model Merchant {
   whatsappMessages  WhatsAppMessage[]
   bankConnections   BankConnection[]
   bankTransactions  BankTransaction[]
+  cashCrisisAlerts  CashCrisisAlert[]
   muhasebeciLinks   MuhasebeciLink[]
   factoringRequests FactoringRequest[]
   aiAssistantChats  AiAssistantChat[]
@@ -491,6 +516,34 @@ model BankTransaction {
   @@index([connectionId])
   @@index([transactionDate(sort: Desc)])
   @@map("bank_transactions")
+}
+
+model CashCrisisAlert {
+  id              String              @id @default(uuid())
+  merchantId      String
+  type            CashCrisisType
+  severity        CashCrisisSeverity
+  status          CashCrisisStatus    @default(ACTIVE)
+  title           String
+  message         String
+  recommendation  String?
+  daysUntilCrisis Int?
+  predictedDate   DateTime?
+  impactAmount    Decimal?            @db.Decimal(18, 2)
+  currency        String              @default("TRY")
+  signals         Json?
+  aiInsight       String?
+  dismissedAt     DateTime?
+  resolvedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  merchant        Merchant            @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@index([status])
+  @@index([severity])
+  @@index([predictedDate])
+  @@map("cash_crisis_alerts")
 }
 
 model Customer {
