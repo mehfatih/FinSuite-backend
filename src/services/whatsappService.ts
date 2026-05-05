@@ -14,6 +14,9 @@ export type WhatsAppSendInput = {
   templateName?: string;
   templateParams?: string[];
   mediaUrl?: string;
+  mediaType?: "image" | "document" | "video";  // default "document" if mediaUrl present
+  documentName?: string;       // filename shown to recipient
+  caption?: string;            // caption text under media
 };
 
 export type WhatsAppSendResult = {
@@ -48,8 +51,7 @@ export async function sendWhatsAppMessage(
     return { success: false, error: "Invalid recipient phone" };
   }
 
-  // Build the request body. If templateName is given, use template path.
-  // Otherwise send a plain text message.
+  // Build the request body. Priority: template > media > text.
   let body: any;
   if (input.templateName) {
     body = {
@@ -71,6 +73,19 @@ export async function sendWhatsAppMessage(
             ]
           : [],
       },
+    };
+  } else if (input.mediaUrl) {
+    const mediaType = input.mediaType || "document";
+    const mediaPayload: any = { link: input.mediaUrl };
+    if (input.caption) mediaPayload.caption = input.caption;
+    if (mediaType === "document" && input.documentName) {
+      mediaPayload.filename = input.documentName;
+    }
+    body = {
+      messaging_product: "whatsapp",
+      to: phone,
+      type: mediaType,
+      [mediaType]: mediaPayload,
     };
   } else {
     body = {
