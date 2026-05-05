@@ -3,3 +3,13 @@ dist
 .env
 .next
 *.log
+
+# Edit scripts (Python automation files)
+*.py
+
+# Backup files
+*.backup-*
+**/*.backup-*
+
+# Archives
+src/**/*.zip
