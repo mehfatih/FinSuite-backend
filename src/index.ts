@@ -35,12 +35,15 @@ import recurringRoutes     from "./routes/recurring";
 import marketplaceRoutes   from "./routes/marketplace";
 import taxCalendarRoutes   from "./routes/taxCalendar";
 import benchmarkRoutes     from "./routes/benchmark";
+import cronRoutes 	   from "./routes/cronRoutes";
+import plansRoutes from "./routes/plans";
 import { publicProfileController } from "./controllers/publicProfileController";
 // v4
 import invoicePdfRoutes from './routes/invoicePdfRoutes';
 import otpRoutes from './routes/otpRoutes';
 import teamRoutes from './routes/teamRoutes';
 import campaignRoutes from './routes/campaignRoutes';
+import publicAiDemoRoutes from './routes/publicAiDemo';
 
 const app = express();
 
@@ -62,6 +65,7 @@ app.use("/api/customers",     customerRoutes);
 app.use("/api/deals",         dealRoutes);
 app.use("/api/tasks",         taskRoutes);
 app.use("/api/ai",            aiRoutes);
+app.use("/api/public-ai-demo", publicAiDemoRoutes);
 app.use("/api/admin",         adminRoutes);
 app.use("/api/profile",       profileRoutes);
 app.use("/api/notifications", notificationRoutes);
@@ -83,6 +87,8 @@ app.use("/api/recurring",      recurringRoutes);
 app.use("/api/marketplace",    marketplaceRoutes);
 app.use("/api/tax-calendar",   taxCalendarRoutes);
 app.use("/api/benchmark",      benchmarkRoutes);
+app.use("/api/plans", plansRoutes);
+app.use('/api/cron',           cronRoutes);
 // v4
 app.use('/api/invoices',   invoicePdfRoutes);  // يضيف /:id/pdf على الـ invoices الموجود
 app.use('/api/auth/otp',   otpRoutes);
@@ -96,8 +102,8 @@ app.use(errorHandler);
 
 async function bootstrap(): Promise<void> {
   app.listen(env.port, () => {
-    console.log(`\n🚀 Zyrix FinSuite v3.0 — port ${env.port}`);
-    console.log(`✨ 15 features | 25 routes active\n`);
+    console.log(`\n🚀 Zyrix FinSuite v3.1 — port ${env.port}`);
+    console.log(`✨ 16 features | 26 routes active\n`);
   });
   try { await prisma.$connect(); console.log("✅ Database connected"); }
   catch (err) { console.error("❌ Database error:", err); }
