@@ -30,6 +30,7 @@ import installmentRoutes   from "./routes/installments";
 import checkRoutes         from "./routes/checks";
 import whatsappRoutes      from "./routes/whatsapp";
 import banksRoutes         from "./routes/banks";
+import aiCfoVoiceRoutes from "./routes/aiCfoVoice";
 import personnelRoutes     from "./routes/personnel";
 import publicProfileRoutes from "./routes/publicProfile";
 import recurringRoutes     from "./routes/recurring";
@@ -85,6 +86,7 @@ app.use("/api/installments",   installmentRoutes);
 app.use("/api/checks",         checkRoutes);
 app.use("/api/whatsapp",       whatsappRoutes);
 app.use("/api/banks",          banksRoutes);
+app.use("/api/ai-cfo", aiCfoVoiceRoutes);
 app.use("/api/personnel",      personnelRoutes);
 app.use("/api/profile-page",   publicProfileRoutes);
 app.use("/api/recurring",      recurringRoutes);
@@ -108,8 +110,8 @@ app.use(errorHandler);
 
 async function bootstrap(): Promise<void> {
   app.listen(env.port, () => {
-    console.log(`\n🚀 Zyrix FinSuite v3.4 — port ${env.port}`);
-    console.log(`✨ 20 features | 33 routes active\n`);
+    console.log(`\n🚀 Zyrix FinSuite v3.5 — port ${env.port}`);
+    console.log(`✨ 21 features | 37 routes active\n`);
   });
   try { await prisma.$connect(); console.log("✅ Database connected"); }
   catch (err) { console.error("❌ Database error:", err); }
