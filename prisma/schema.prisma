@@ -111,6 +111,24 @@ enum EFaturaStatus {
   CANCELLED
 }
 
+enum EIrsaliyeStatus {
+  DRAFT
+  READY_TO_SEND
+  QUEUED
+  SENT_PENDING_GIB
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum ReceiptScanStatus {
+  PENDING
+  PROCESSING
+  PARSED
+  FAILED
+  CONVERTED
+}
+
 enum MuhasebeciAccessLevel {
   READ_ONLY
   EXPORT
@@ -221,6 +239,8 @@ model Merchant {
   paymentLinks      PaymentLink[]
   featureFlags      FeatureFlag[]
   eFaturalar        EFatura[]
+  eIrsaliyeler      EIrsaliye[]
+  receiptScans      ReceiptScan[]
   muhasebeciLinks   MuhasebeciLink[]
   factoringRequests FactoringRequest[]
   aiAssistantChats  AiAssistantChat[]
@@ -292,6 +312,68 @@ model EFatura {
   invoice         Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@map("e_faturalar")
+}
+
+model EIrsaliye {
+  id              String          @id @default(uuid())
+  merchantId      String
+  irsaliyeNo      String          @unique
+  irsaliyeType    String          @default("SEVK")
+  status          EIrsaliyeStatus @default(DRAFT)
+  gibUUID         String?
+  gibResponse     Json?
+  xmlContent      String?
+  pdfUrl          String?
+  buyerVkn        String?
+  buyerTitle      String?
+  buyerAddress    String?
+  deliveryAddress String?
+  deliveryDate    DateTime?
+  vehiclePlate    String?
+  driverName      String?
+  driverTcKimlik  String?
+  items           Json            @default("[]")
+  totalAmount     Decimal         @default(0) @db.Decimal(18, 2)
+  currency        String          @default("TRY")
+  notes           String?
+  queuedAt        DateTime?
+  sentAt          DateTime?
+  acceptedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  merchant        Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@index([status])
+  @@map("e_irsaliyeler")
+}
+
+model ReceiptScan {
+  id                  String            @id @default(uuid())
+  merchantId          String
+  imageUrl            String?
+  imageBase64         String?
+  status              ReceiptScanStatus @default(PENDING)
+  parsedVendor        String?
+  parsedAmount        Decimal?          @db.Decimal(18, 2)
+  parsedCurrency      String?           @default("TRY")
+  parsedDate          DateTime?
+  parsedCategory      String?
+  parsedDescription   String?
+  parsedTaxAmount     Decimal?          @db.Decimal(18, 2)
+  parsedTaxRate       Decimal?          @db.Decimal(5, 2)
+  parsedRawJson       Json?
+  failureReason       String?
+  convertedExpenseId  String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  merchant            Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@index([status])
+  @@map("receipt_scans")
 }
 
 model Customer {
