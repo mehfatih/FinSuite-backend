@@ -121,6 +121,37 @@ enum EIrsaliyeStatus {
   CANCELLED
 }
 
+enum WhatsAppStatus {
+  PENDING
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum BankProvider {
+  GARANTI
+  IS_BANKASI
+  YAPI_KREDI
+  AKBANK
+  ZIRAAT
+  OTHER
+}
+
+enum BankConnectionStatus {
+  PENDING
+  CONNECTED
+  EXPIRED
+  REVOKED
+  ERROR
+}
+
+enum BankTxnDirection {
+  IN
+  OUT
+}
+
 enum ReceiptScanStatus {
   PENDING
   PROCESSING
@@ -241,6 +272,9 @@ model Merchant {
   eFaturalar        EFatura[]
   eIrsaliyeler      EIrsaliye[]
   receiptScans      ReceiptScan[]
+  whatsappMessages  WhatsAppMessage[]
+  bankConnections   BankConnection[]
+  bankTransactions  BankTransaction[]
   muhasebeciLinks   MuhasebeciLink[]
   factoringRequests FactoringRequest[]
   aiAssistantChats  AiAssistantChat[]
@@ -374,6 +408,89 @@ model ReceiptScan {
   @@index([merchantId])
   @@index([status])
   @@map("receipt_scans")
+}
+
+model WhatsAppMessage {
+  id                String          @id @default(uuid())
+  merchantId        String
+  invoiceId         String?
+  recipientPhone    String
+  messageType       String          @default("invoice")
+  templateName      String?
+  bodyText          String?
+  mediaUrl          String?
+  status            WhatsAppStatus  @default(PENDING)
+  providerMessageId String?
+  providerResponse  Json?
+  failureReason     String?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  merchant          Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@index([invoiceId])
+  @@index([status])
+  @@map("whatsapp_messages")
+}
+
+model BankConnection {
+  id              String                @id @default(uuid())
+  merchantId      String
+  provider        BankProvider
+  accountHolder   String
+  accountNumber   String?
+  iban            String?               @unique(map: "bank_connections_iban_key")
+  currency        String                @default("TRY")
+  branchCode      String?
+  branchName      String?
+  status          BankConnectionStatus  @default(PENDING)
+  accessToken     String?
+  refreshToken    String?
+  tokenExpiresAt  DateTime?
+  lastSyncAt      DateTime?
+  lastSyncError   String?
+  providerData    Json?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  merchant        Merchant              @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  transactions    BankTransaction[]
+
+  @@index([merchantId])
+  @@index([provider])
+  @@index([status])
+  @@map("bank_connections")
+}
+
+model BankTransaction {
+  id               String           @id @default(uuid())
+  merchantId       String
+  connectionId     String
+  providerTxnId    String?
+  direction        BankTxnDirection
+  amount           Decimal          @db.Decimal(18, 2)
+  currency         String           @default("TRY")
+  description      String?
+  counterpartyName String?
+  counterpartyIban String?
+  reference        String?
+  transactionDate  DateTime
+  valueDate        DateTime?
+  balanceAfter     Decimal?         @db.Decimal(18, 2)
+  category         String?
+  matchedInvoiceId String?
+  matchedExpenseId String?
+  providerData     Json?
+  createdAt        DateTime         @default(now())
+  merchant         Merchant         @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  connection       BankConnection   @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@index([connectionId])
+  @@index([transactionDate(sort: Desc)])
+  @@map("bank_transactions")
 }
 
 model Customer {

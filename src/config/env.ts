@@ -13,4 +13,10 @@ export const env = {
   iyzicoApiKey:     process.env.IYZICO_API_KEY || "",
   iyzicoSecretKey:  process.env.IYZICO_SECRET_KEY || "",
   iyzicoBaseUrl:    process.env.IYZICO_BASE_URL || "https://sandbox.iyzipay.com",
+  // WhatsApp (Meta Cloud API)
+  whatsappToken:    process.env.WHATSAPP_TOKEN || "",
+  whatsappPhoneId:  process.env.WHATSAPP_PHONE_ID || "",
+  whatsappBusinessId: process.env.WHATSAPP_BUSINESS_ID || "",
+  // Bank integrations (placeholder - real keys per bank go in DB per merchant)
+  bankSandboxMode:  (process.env.BANK_SANDBOX_MODE || "true") === "true",
 };

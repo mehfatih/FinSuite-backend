@@ -1,139 +1,190 @@
-// ================================================================
-// Zyrix FinSuite — WhatsApp Business Controller (Feature 9)
-// Fatura gönderimi + ödeme hatırlatma via WhatsApp Business API
-// ================================================================
-import { Response, RequestHandler } from "express";
+// ============================================================
+// Zyrix FinSuite - WhatsApp Controller
+// Sprint 1 Phase 1B
+//
+// Endpoints (all authenticated):
+//   POST /api/whatsapp/send-invoice/:invoiceId  send an invoice via WA
+//   GET  /api/whatsapp                          list sent messages
+//   GET  /api/whatsapp/:id                      get one message
+// ============================================================
+
+import { Request, Response } from "express";
+import { z } from "zod";
 import { prisma } from "../config/database";
-import { AuthenticatedRequest } from "../types";
+import { sendWhatsAppMessage } from "../services/whatsappService";
 
-const h = (fn: Function): RequestHandler => fn as RequestHandler;
+interface AuthenticatedRequest extends Request {
+  merchant?: {
+    id: string;
+    email: string;
+    plan?: string;
+  };
+}
 
-const WA_TOKEN   = process.env.WHATSAPP_TOKEN;
-const WA_PHONE   = process.env.WHATSAPP_PHONE_ID;
-const FRONTEND   = process.env.FRONTEND_URL || "https://finsuite.zyrix.co";
+const sendInvoiceSchema = z.object({
+  recipientPhone: z.string().trim().min(8).max(20).optional(),
+  customMessage: z.string().max(1000).optional(),
+});
 
-// ── WhatsApp API Sender ───────────────────────────────────────
-async function sendWhatsApp(to: string, message: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
-  // Türkiye formatı normalize et: 05xx → +905xx
-  const normalized = to.replace(/\s/g, "").replace(/^0/, "+90");
+const listSchema = z.object({
+  status: z
+    .enum(["PENDING", "QUEUED", "SENT", "DELIVERED", "READ", "FAILED"])
+    .optional(),
+  invoiceId: z.string().uuid().optional(),
+  limit: z.coerce.number().min(1).max(200).optional(),
+  offset: z.coerce.number().min(0).optional(),
+});
 
-  if (!WA_TOKEN || !WA_PHONE) {
-    console.log(`[WhatsApp] Sandbox — would send to ${normalized}: ${message.slice(0, 60)}...`);
-    return { success: true, messageId: `sandbox-${Date.now()}` };
+function ok(res: Response, data: any, status = 200) {
+  return res.status(status).json({ success: true, data });
+}
+
+function fail(res: Response, status: number, error: string) {
+  return res.status(status).json({ success: false, error });
+}
+
+// ----------------------------------------------------------------
+// POST /api/whatsapp/send-invoice/:invoiceId
+// ----------------------------------------------------------------
+
+export async function sendInvoiceHandler(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  if (!req.merchant?.id) return fail(res, 401, "Not authenticated");
+
+  const invoiceId = String(req.params.invoiceId || "");
+  if (!invoiceId) return fail(res, 400, "invoiceId is required");
+
+  const parsed = sendInvoiceSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return fail(res, 400, parsed.error.errors[0]?.message || "Invalid input");
+  }
+  const { recipientPhone, customMessage } = parsed.data;
+
+  // Load invoice
+  const invoice = await prisma.invoice.findFirst({
+    where: { id: invoiceId, merchantId: req.merchant.id },
+  });
+  if (!invoice) return fail(res, 404, "Invoice not found");
+
+  const phone = recipientPhone || invoice.customerPhone;
+  if (!phone) {
+    return fail(
+      res,
+      422,
+      "No recipient phone. Provide one or set customer phone on the invoice."
+    );
   }
 
-  try {
-    const res = await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${WA_TOKEN}` },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: normalized.replace("+", ""),
-        type: "text",
-        text: { body: message },
-      }),
+  // Build message text
+  const total = String(invoice.total);
+  const text =
+    customMessage ||
+    "Merhaba " +
+      invoice.customerName +
+      ", #" +
+      invoice.invoiceNumber +
+      " numarali faturaniz hazirdir. Tutar: " +
+      total +
+      " " +
+      invoice.currency +
+      ". Vade: " +
+      invoice.dueDate.toISOString().substring(0, 10);
+
+  // 1. Insert PENDING row
+  const initial = await prisma.whatsAppMessage.create({
+    data: {
+      merchantId: req.merchant.id,
+      invoiceId: invoice.id,
+      recipientPhone: phone,
+      messageType: "invoice",
+      bodyText: text,
+      status: "PENDING" as any,
+    } as any,
+  });
+
+  // 2. Send via Meta Cloud API
+  const result = await sendWhatsAppMessage({
+    recipientPhone: phone,
+    bodyText: text,
+  });
+
+  // 3. Persist outcome
+  if (!result.success) {
+    const failed = await prisma.whatsAppMessage.update({
+      where: { id: initial.id },
+      data: {
+        status: "FAILED" as any,
+        failureReason: result.error || "Unknown error",
+        providerResponse: (result.providerResponse as any) || undefined,
+      } as any,
     });
-    const data = await res.json();
-    if (!res.ok) return { success: false, error: data?.error?.message || "WhatsApp API error" };
-    return { success: true, messageId: data?.messages?.[0]?.id };
-  } catch (e: any) {
-    return { success: false, error: e.message };
+    return fail(res, 502, result.error || "WhatsApp send failed");
   }
+
+  const sent = await prisma.whatsAppMessage.update({
+    where: { id: initial.id },
+    data: {
+      status: "SENT" as any,
+      providerMessageId: result.providerMessageId || null,
+      providerResponse: (result.providerResponse as any) || undefined,
+      sentAt: new Date(),
+    } as any,
+  });
+
+  // Update Invoice.whatsappSentAt for quick reference
+  await prisma.invoice.update({
+    where: { id: invoice.id },
+    data: { whatsappSentAt: new Date() } as any,
+  });
+
+  return ok(res, sent, 201);
 }
 
-// ── Mesaj Şablonları ─────────────────────────────────────────
-function invoiceMessage(invoice: any, merchant: any): string {
-  return `🧾 *Fatura Bildirimi*\n\nSayın ${invoice.customerName},\n\n*${merchant.businessName || merchant.name}* tarafından size fatura kesildi.\n\n📋 Fatura No: *${invoice.invoiceNumber}*\n💰 Tutar: *${Number(invoice.total).toLocaleString("tr-TR")} ${invoice.currency}*\n📅 Vade: *${new Date(invoice.dueDate).toLocaleDateString("tr-TR")}*\n\nBilgi için iletişime geçebilirsiniz.\n\n_Zyrix FinSuite_`;
+// ----------------------------------------------------------------
+// GET /api/whatsapp - list
+// ----------------------------------------------------------------
+
+export async function listHandler(req: AuthenticatedRequest, res: Response) {
+  if (!req.merchant?.id) return fail(res, 401, "Not authenticated");
+
+  const parsed = listSchema.safeParse(req.query);
+  if (!parsed.success) {
+    return fail(res, 400, parsed.error.errors[0]?.message || "Invalid query");
+  }
+  const { status, invoiceId, limit, offset } = parsed.data;
+
+  const where: any = { merchantId: req.merchant.id };
+  if (status) where.status = status;
+  if (invoiceId) where.invoiceId = invoiceId;
+
+  const [rows, total] = await Promise.all([
+    prisma.whatsAppMessage.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit ?? 50,
+      skip: offset ?? 0,
+    }),
+    prisma.whatsAppMessage.count({ where }),
+  ]);
+
+  return ok(res, { rows, total });
 }
 
-function reminderMessage(invoice: any, merchant: any, daysOverdue: number): string {
-  const isOverdue = daysOverdue > 0;
-  return `${isOverdue ? "⚠️" : "🔔"} *Ödeme ${isOverdue ? "Hatırlatması" : "Yaklaşıyor"}*\n\nSayın ${invoice.customerName},\n\n${isOverdue ? `*${daysOverdue} gün* önce vadesi dolan` : "Yakında vadesi gelecek"} ${invoice.invoiceNumber} no'lu faturanız için ödeme beklenmektedir.\n\n💰 Tutar: *${Number(invoice.total).toLocaleString("tr-TR")} ${invoice.currency}*\n📅 Vade: *${new Date(invoice.dueDate).toLocaleDateString("tr-TR")}*\n\nÖdemenizi gerçekleştirdiyseniz bu mesajı dikkate almayınız.\n\n_${merchant.businessName || merchant.name}_`;
+// ----------------------------------------------------------------
+// GET /api/whatsapp/:id
+// ----------------------------------------------------------------
+
+export async function getHandler(req: AuthenticatedRequest, res: Response) {
+  if (!req.merchant?.id) return fail(res, 401, "Not authenticated");
+  const id = String(req.params.id || "");
+  if (!id) return fail(res, 400, "id is required");
+
+  const row = await prisma.whatsAppMessage.findFirst({
+    where: { id, merchantId: req.merchant.id },
+  });
+  if (!row) return fail(res, 404, "Not found");
+
+  return ok(res, row);
 }
-
-export const whatsappController = {
-
-  // ── POST /api/whatsapp/send-invoice/:invoiceId
-  sendInvoice: h(async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const invoice = await prisma.invoice.findFirst({
-        where: { id: req.params.invoiceId, merchantId: req.merchant!.id },
-      });
-      if (!invoice) return res.status(404).json({ success: false, error: "Fatura bulunamadı" });
-      if (!invoice.customerPhone) return res.status(400).json({ success: false, error: "Müşteri telefon numarası yok" });
-
-      const merchant = await prisma.merchant.findUnique({ where: { id: req.merchant!.id }, select: { name: true, businessName: true } });
-      const message = invoiceMessage(invoice, merchant);
-      const result = await sendWhatsApp(invoice.customerPhone, message);
-
-      await prisma.invoice.update({
-        where: { id: invoice.id },
-        data: { whatsappSentAt: new Date(), whatsappStatus: result.success ? "sent" : "failed" },
-      });
-
-      res.json({ success: result.success, data: { messageId: result.messageId }, message: result.success ? "Fatura WhatsApp ile gönderildi" : result.error });
-    } catch { res.status(500).json({ success: false, error: "WhatsApp gönderilemedi" }); }
-  }),
-
-  // ── POST /api/whatsapp/remind/:invoiceId
-  sendReminder: h(async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const invoice = await prisma.invoice.findFirst({
-        where: { id: req.params.invoiceId, merchantId: req.merchant!.id },
-      });
-      if (!invoice) return res.status(404).json({ success: false, error: "Fatura bulunamadı" });
-      if (!invoice.customerPhone) return res.status(400).json({ success: false, error: "Müşteri telefon numarası yok" });
-      if (invoice.status === "PAID") return res.status(400).json({ success: false, error: "Fatura zaten ödendi" });
-
-      const daysOverdue = Math.floor((Date.now() - new Date(invoice.dueDate).getTime()) / 86400000);
-      const merchant = await prisma.merchant.findUnique({ where: { id: req.merchant!.id }, select: { name: true, businessName: true } });
-      const message = reminderMessage(invoice, merchant, daysOverdue);
-      const result = await sendWhatsApp(invoice.customerPhone, message);
-
-      res.json({ success: result.success, data: { messageId: result.messageId, daysOverdue }, message: result.success ? "Hatırlatma gönderildi" : result.error });
-    } catch { res.status(500).json({ success: false, error: "Hatırlatma gönderilemedi" }); }
-  }),
-
-  // ── POST /api/whatsapp/bulk-remind — vadesi geçmiş tümüne gönder
-  bulkRemind: h(async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const merchantId = req.merchant!.id;
-      const overdueInvoices = await prisma.invoice.findMany({
-        where: { merchantId, status: { in: ["SENT", "OVERDUE"] }, dueDate: { lt: new Date() }, customerPhone: { not: null } },
-        take: 20,
-      });
-
-      if (overdueInvoices.length === 0) return res.json({ success: true, data: { sent: 0 }, message: "Vadesi geçmiş fatura yok" });
-
-      const merchant = await prisma.merchant.findUnique({ where: { id: merchantId }, select: { name: true, businessName: true } });
-      let sent = 0, failed = 0;
-
-      for (const invoice of overdueInvoices) {
-        const daysOverdue = Math.floor((Date.now() - new Date(invoice.dueDate).getTime()) / 86400000);
-        const result = await sendWhatsApp(invoice.customerPhone!, reminderMessage(invoice, merchant, daysOverdue));
-        if (result.success) {
-          sent++;
-          await prisma.invoice.update({ where: { id: invoice.id }, data: { whatsappSentAt: new Date(), whatsappStatus: "sent" } });
-        } else { failed++; }
-        await new Promise(r => setTimeout(r, 500)); // Rate limit
-      }
-
-      res.json({ success: true, data: { sent, failed, total: overdueInvoices.length } });
-    } catch { res.status(500).json({ success: false, error: "Toplu gönderim başarısız" }); }
-  }),
-
-  // ── POST /api/whatsapp/custom — özel mesaj
-  sendCustom: h(async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { phone, message } = req.body;
-      if (!phone || !message) return res.status(400).json({ success: false, error: "Telefon ve mesaj zorunlu" });
-      const result = await sendWhatsApp(phone, message);
-      res.json({ success: result.success, data: { messageId: result.messageId }, error: result.error });
-    } catch { res.status(500).json({ success: false, error: "Mesaj gönderilemedi" }); }
-  }),
-
-  // ── GET /api/whatsapp/status — sandbox/production durumu
-  status: h(async (req: AuthenticatedRequest, res: Response) => {
-    res.json({ success: true, data: { mode: WA_TOKEN ? "production" : "sandbox", configured: !!WA_TOKEN, phoneId: WA_PHONE || null } });
-  }),
-};
