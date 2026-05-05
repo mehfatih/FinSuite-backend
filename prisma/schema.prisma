@@ -176,6 +176,29 @@ enum CashCrisisStatus {
   EXPIRED
 }
 
+enum TrendyolOrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum TrendyolSettlementStatus {
+  PENDING
+  PAID
+  RECONCILED
+  DISCREPANCY
+}
+
+enum TrendyolConnectionStatus {
+  PENDING
+  CONNECTED
+  EXPIRED
+  ERROR
+}
+
 enum ReceiptScanStatus {
   PENDING
   PROCESSING
@@ -300,6 +323,9 @@ model Merchant {
   bankConnections   BankConnection[]
   bankTransactions  BankTransaction[]
   cashCrisisAlerts  CashCrisisAlert[]
+  trendyolConnection  TrendyolConnection?
+  trendyolOrders      TrendyolOrder[]
+  trendyolSettlements TrendyolSettlement[]
   muhasebeciLinks   MuhasebeciLink[]
   factoringRequests FactoringRequest[]
   aiAssistantChats  AiAssistantChat[]
@@ -544,6 +570,91 @@ model CashCrisisAlert {
   @@index([severity])
   @@index([predictedDate])
   @@map("cash_crisis_alerts")
+}
+
+model TrendyolConnection {
+  id            String                    @id @default(uuid())
+  merchantId    String                    @unique
+  sellerId      String?
+  apiKey        String?
+  apiSecret     String?
+  storeName     String?
+  status        TrendyolConnectionStatus  @default(PENDING)
+  lastSyncAt    DateTime?
+  lastSyncError String?
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  merchant      Merchant                  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  orders        TrendyolOrder[]
+  settlements   TrendyolSettlement[]
+
+  @@index([status])
+  @@map("trendyol_connections")
+}
+
+model TrendyolOrder {
+  id              String              @id @default(uuid())
+  merchantId      String
+  connectionId    String
+  trendyolOrderId String
+  orderNumber     String
+  status          TrendyolOrderStatus
+  customerName    String?
+  productName     String?
+  quantity        Int                 @default(1)
+  grossAmount     Decimal             @db.Decimal(18, 2)
+  commission      Decimal             @default(0) @db.Decimal(18, 2)
+  shippingCost    Decimal             @default(0) @db.Decimal(18, 2)
+  netAmount       Decimal             @db.Decimal(18, 2)
+  currency        String              @default("TRY")
+  orderDate       DateTime
+  shippedDate     DateTime?
+  deliveredDate   DateTime?
+  matchedTxnId    String?
+  providerData    Json?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  merchant        Merchant            @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  connection      TrendyolConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, trendyolOrderId])
+  @@index([merchantId])
+  @@index([status])
+  @@index([orderDate(sort: Desc)])
+  @@index([matchedTxnId])
+  @@map("trendyol_orders")
+}
+
+model TrendyolSettlement {
+  id                    String                   @id @default(uuid())
+  merchantId            String
+  connectionId          String
+  trendyolSettlementId  String
+  periodStart           DateTime
+  periodEnd             DateTime
+  grossSales            Decimal                  @default(0) @db.Decimal(18, 2)
+  totalCommission       Decimal                  @default(0) @db.Decimal(18, 2)
+  totalShipping         Decimal                  @default(0) @db.Decimal(18, 2)
+  totalReturns          Decimal                  @default(0) @db.Decimal(18, 2)
+  netPayout             Decimal                  @db.Decimal(18, 2)
+  currency              String                   @default("TRY")
+  status                TrendyolSettlementStatus @default(PENDING)
+  expectedPayoutDate    DateTime?
+  actualPayoutDate      DateTime?
+  matchedTxnId          String?
+  discrepancy           Decimal?                 @db.Decimal(18, 2)
+  orderCount            Int                      @default(0)
+  providerData          Json?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  merchant              Merchant                 @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  connection            TrendyolConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, trendyolSettlementId])
+  @@index([merchantId])
+  @@index([status])
+  @@index([periodStart(sort: Desc)])
+  @@map("trendyol_settlements")
 }
 
 model Customer {
