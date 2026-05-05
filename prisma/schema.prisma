@@ -30,10 +30,12 @@ enum MerchantStatus {
 }
 
 enum PlanName {
-  STARTER
-  BUSINESS
+  E_DONUSUM
+  ON_MUHASEBE
   PRO
   ENTERPRISE
+  STARTER
+  BUSINESS
 }
 
 enum InvoiceStatus {
@@ -190,7 +192,7 @@ model Merchant {
   language       Language       @default(TR)
   currency       Currency       @default(TRY)
   status         MerchantStatus @default(TRIAL)
-  plan           PlanName       @default(STARTER)
+  plan           PlanName       @default(E_DONUSUM)
   businessName   String?
   businessType   String?
   country        String         @default("TR")
