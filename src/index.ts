@@ -114,8 +114,8 @@ app.use(errorHandler);
 
 async function bootstrap(): Promise<void> {
   app.listen(env.port, () => {
-    console.log(`\n🚀 Zyrix FinSuite v3.7 — port ${env.port}`);
-    console.log(`✨ 23 features | 48 routes active\n`);
+    console.log(`\n🚀 Zyrix FinSuite v3.8 — port ${env.port}`);
+    console.log(`✨ 24 features | 56 routes active\n`);
   });
   try { await prisma.$connect(); console.log("✅ Database connected"); }
   catch (err) { console.error("❌ Database error:", err); }

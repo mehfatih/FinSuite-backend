@@ -199,6 +199,52 @@ enum TrendyolConnectionStatus {
   ERROR
 }
 
+enum MarketplaceProvider {
+  TRENDYOL
+  HEPSIBURADA
+  N11
+  CICEKSEPETI
+  PTTAVM
+  AMAZON_TR
+  GETIR
+  FLO
+  YEMEKSEPETI
+  VATAN
+  SALLA
+  ZID
+  NOON_SA
+  AMAZON_SA
+  JARIR
+  AMAZON_AE
+  NOON_AE
+  NAMSHI
+  CARREFOUR_AE
+  MUMZWORLD
+}
+
+enum MarketplaceConnectionStatus {
+  PENDING
+  CONNECTED
+  EXPIRED
+  ERROR
+}
+
+enum MarketplaceOrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum MarketplaceSettlementStatus {
+  PENDING
+  PAID
+  RECONCILED
+  DISCREPANCY
+}
+
 enum ReceiptScanStatus {
   PENDING
   PROCESSING
@@ -260,14 +306,6 @@ enum RecurringStatus {
   COMPLETED
 }
 
-enum MarketplaceChannel {
-  TRENDYOL
-  HEPSIBURADA
-  AMAZON_TR
-  N11
-  GETIR
-}
-
 enum TaxEventType {
   KDV
   MUHTASAR
@@ -302,42 +340,44 @@ model Merchant {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  invoices          Invoice[]
-  customers         Customer[]
-  deals             Deal[]
-  tasks             Task[]
-  expenses          Expense[]
-  aiConversations   AiConversation[]
-  cashFlowEntries   CashFlowEntry[]
-  commissions       Commission[]
-  campaigns         Campaign[]
-  teamMembers       TeamMember[]
-  notifications     Notification[]
-  subscriptions     Subscription[]
-  paymentLinks      PaymentLink[]
-  featureFlags      FeatureFlag[]
-  eFaturalar        EFatura[]
-  eIrsaliyeler      EIrsaliye[]
-  receiptScans      ReceiptScan[]
-  whatsappMessages  WhatsAppMessage[]
-  bankConnections   BankConnection[]
-  bankTransactions  BankTransaction[]
-  cashCrisisAlerts  CashCrisisAlert[]
-  trendyolConnection  TrendyolConnection?
-  trendyolOrders      TrendyolOrder[]
-  trendyolSettlements TrendyolSettlement[]
-  muhasebeciLinks   MuhasebeciLink[]
-  factoringRequests FactoringRequest[]
-  aiAssistantChats  AiAssistantChat[]
-  stockItems        StockItem[]
-  installmentPlans  InstallmentPlan[]
-  checks            Check[]
-  personnel         Personnel[]
-  recurringInvoices RecurringInvoice[]
-  marketplaceOrders MarketplaceOrder[]
-  taxEvents         TaxEvent[]
-  benchmarkData     BenchmarkSnapshot[]
-  otpCodes          OtpCode[]
+  invoices               Invoice[]
+  customers              Customer[]
+  deals                  Deal[]
+  tasks                  Task[]
+  expenses               Expense[]
+  aiConversations        AiConversation[]
+  cashFlowEntries        CashFlowEntry[]
+  commissions            Commission[]
+  campaigns              Campaign[]
+  teamMembers            TeamMember[]
+  notifications          Notification[]
+  subscriptions          Subscription[]
+  paymentLinks           PaymentLink[]
+  featureFlags           FeatureFlag[]
+  eFaturalar             EFatura[]
+  eIrsaliyeler           EIrsaliye[]
+  receiptScans           ReceiptScan[]
+  whatsappMessages       WhatsAppMessage[]
+  bankConnections        BankConnection[]
+  bankTransactions       BankTransaction[]
+  cashCrisisAlerts       CashCrisisAlert[]
+  trendyolConnection     TrendyolConnection?
+  trendyolOrders         TrendyolOrder[]
+  trendyolSettlements    TrendyolSettlement[]
+  marketplaceConnections MarketplaceConnection[]
+  marketplaceOrders      MarketplaceOrder[]
+  marketplaceSettlements MarketplaceSettlement[]
+  muhasebeciLinks        MuhasebeciLink[]
+  factoringRequests      FactoringRequest[]
+  aiAssistantChats       AiAssistantChat[]
+  stockItems             StockItem[]
+  installmentPlans       InstallmentPlan[]
+  checks                 Check[]
+  personnel              Personnel[]
+  recurringInvoices      RecurringInvoice[]
+  taxEvents              TaxEvent[]
+  benchmarkData          BenchmarkSnapshot[]
+  otpCodes               OtpCode[]
 
   @@map("merchants")
 }
@@ -436,25 +476,25 @@ model EIrsaliye {
 }
 
 model ReceiptScan {
-  id                  String            @id @default(uuid())
-  merchantId          String
-  imageUrl            String?
-  imageBase64         String?
-  status              ReceiptScanStatus @default(PENDING)
-  parsedVendor        String?
-  parsedAmount        Decimal?          @db.Decimal(18, 2)
-  parsedCurrency      String?           @default("TRY")
-  parsedDate          DateTime?
-  parsedCategory      String?
-  parsedDescription   String?
-  parsedTaxAmount     Decimal?          @db.Decimal(18, 2)
-  parsedTaxRate       Decimal?          @db.Decimal(5, 2)
-  parsedRawJson       Json?
-  failureReason       String?
-  convertedExpenseId  String?
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  merchant            Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  id                 String            @id @default(uuid())
+  merchantId         String
+  imageUrl           String?
+  imageBase64        String?
+  status             ReceiptScanStatus @default(PENDING)
+  parsedVendor       String?
+  parsedAmount       Decimal?          @db.Decimal(18, 2)
+  parsedCurrency     String?           @default("TRY")
+  parsedDate         DateTime?
+  parsedCategory     String?
+  parsedDescription  String?
+  parsedTaxAmount    Decimal?          @db.Decimal(18, 2)
+  parsedTaxRate      Decimal?          @db.Decimal(5, 2)
+  parsedRawJson      Json?
+  failureReason      String?
+  convertedExpenseId String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  merchant           Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@index([merchantId])
   @@index([status])
@@ -462,24 +502,24 @@ model ReceiptScan {
 }
 
 model WhatsAppMessage {
-  id                String          @id @default(uuid())
+  id                String         @id @default(uuid())
   merchantId        String
   invoiceId         String?
   recipientPhone    String
-  messageType       String          @default("invoice")
+  messageType       String         @default("invoice")
   templateName      String?
   bodyText          String?
   mediaUrl          String?
-  status            WhatsAppStatus  @default(PENDING)
+  status            WhatsAppStatus @default(PENDING)
   providerMessageId String?
   providerResponse  Json?
   failureReason     String?
   sentAt            DateTime?
   deliveredAt       DateTime?
   readAt            DateTime?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  merchant          Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  merchant          Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@index([merchantId])
   @@index([invoiceId])
@@ -488,26 +528,26 @@ model WhatsAppMessage {
 }
 
 model BankConnection {
-  id              String                @id @default(uuid())
-  merchantId      String
-  provider        BankProvider
-  accountHolder   String
-  accountNumber   String?
-  iban            String?               @unique(map: "bank_connections_iban_key")
-  currency        String                @default("TRY")
-  branchCode      String?
-  branchName      String?
-  status          BankConnectionStatus  @default(PENDING)
-  accessToken     String?
-  refreshToken    String?
-  tokenExpiresAt  DateTime?
-  lastSyncAt      DateTime?
-  lastSyncError   String?
-  providerData    Json?
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
-  merchant        Merchant              @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  transactions    BankTransaction[]
+  id             String               @id @default(uuid())
+  merchantId     String
+  provider       BankProvider
+  accountHolder  String
+  accountNumber  String?
+  iban           String?              @unique(map: "bank_connections_iban_key")
+  currency       String               @default("TRY")
+  branchCode     String?
+  branchName     String?
+  status         BankConnectionStatus @default(PENDING)
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  lastSyncAt     DateTime?
+  lastSyncError  String?
+  providerData   Json?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  merchant       Merchant             @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  transactions   BankTransaction[]
 
   @@index([merchantId])
   @@index([provider])
@@ -545,25 +585,25 @@ model BankTransaction {
 }
 
 model CashCrisisAlert {
-  id              String              @id @default(uuid())
+  id              String             @id @default(uuid())
   merchantId      String
   type            CashCrisisType
   severity        CashCrisisSeverity
-  status          CashCrisisStatus    @default(ACTIVE)
+  status          CashCrisisStatus   @default(ACTIVE)
   title           String
   message         String
   recommendation  String?
   daysUntilCrisis Int?
   predictedDate   DateTime?
-  impactAmount    Decimal?            @db.Decimal(18, 2)
-  currency        String              @default("TRY")
+  impactAmount    Decimal?           @db.Decimal(18, 2)
+  currency        String             @default("TRY")
   signals         Json?
   aiInsight       String?
   dismissedAt     DateTime?
   resolvedAt      DateTime?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  merchant        Merchant            @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  merchant        Merchant           @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@index([merchantId])
   @@index([status])
@@ -573,18 +613,18 @@ model CashCrisisAlert {
 }
 
 model TrendyolConnection {
-  id            String                    @id @default(uuid())
-  merchantId    String                    @unique
+  id            String                   @id @default(uuid())
+  merchantId    String                   @unique
   sellerId      String?
   apiKey        String?
   apiSecret     String?
   storeName     String?
-  status        TrendyolConnectionStatus  @default(PENDING)
+  status        TrendyolConnectionStatus @default(PENDING)
   lastSyncAt    DateTime?
   lastSyncError String?
-  createdAt     DateTime                  @default(now())
-  updatedAt     DateTime                  @updatedAt
-  merchant      Merchant                  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  merchant      Merchant                 @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   orders        TrendyolOrder[]
   settlements   TrendyolSettlement[]
 
@@ -626,35 +666,128 @@ model TrendyolOrder {
 }
 
 model TrendyolSettlement {
-  id                    String                   @id @default(uuid())
-  merchantId            String
-  connectionId          String
-  trendyolSettlementId  String
-  periodStart           DateTime
-  periodEnd             DateTime
-  grossSales            Decimal                  @default(0) @db.Decimal(18, 2)
-  totalCommission       Decimal                  @default(0) @db.Decimal(18, 2)
-  totalShipping         Decimal                  @default(0) @db.Decimal(18, 2)
-  totalReturns          Decimal                  @default(0) @db.Decimal(18, 2)
-  netPayout             Decimal                  @db.Decimal(18, 2)
-  currency              String                   @default("TRY")
-  status                TrendyolSettlementStatus @default(PENDING)
-  expectedPayoutDate    DateTime?
-  actualPayoutDate      DateTime?
-  matchedTxnId          String?
-  discrepancy           Decimal?                 @db.Decimal(18, 2)
-  orderCount            Int                      @default(0)
-  providerData          Json?
-  createdAt             DateTime                 @default(now())
-  updatedAt             DateTime                 @updatedAt
-  merchant              Merchant                 @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  connection            TrendyolConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  id                   String                   @id @default(uuid())
+  merchantId           String
+  connectionId         String
+  trendyolSettlementId String
+  periodStart          DateTime
+  periodEnd            DateTime
+  grossSales           Decimal                  @default(0) @db.Decimal(18, 2)
+  totalCommission      Decimal                  @default(0) @db.Decimal(18, 2)
+  totalShipping        Decimal                  @default(0) @db.Decimal(18, 2)
+  totalReturns         Decimal                  @default(0) @db.Decimal(18, 2)
+  netPayout            Decimal                  @db.Decimal(18, 2)
+  currency             String                   @default("TRY")
+  status               TrendyolSettlementStatus @default(PENDING)
+  expectedPayoutDate   DateTime?
+  actualPayoutDate     DateTime?
+  matchedTxnId         String?
+  discrepancy          Decimal?                 @db.Decimal(18, 2)
+  orderCount           Int                      @default(0)
+  providerData         Json?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  merchant             Merchant                 @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  connection           TrendyolConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
   @@unique([connectionId, trendyolSettlementId])
   @@index([merchantId])
   @@index([status])
   @@index([periodStart(sort: Desc)])
   @@map("trendyol_settlements")
+}
+
+model MarketplaceConnection {
+  id            String                      @id @default(uuid())
+  merchantId    String
+  provider      MarketplaceProvider
+  sellerId      String?
+  apiKey        String?
+  apiSecret     String?
+  storeName     String?
+  region        String?
+  status        MarketplaceConnectionStatus @default(PENDING)
+  lastSyncAt    DateTime?
+  lastSyncError String?
+  createdAt     DateTime                    @default(now())
+  updatedAt     DateTime                    @updatedAt
+  merchant      Merchant                    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  orders        MarketplaceOrder[]
+  settlements   MarketplaceSettlement[]
+
+  @@unique([merchantId, provider])
+  @@index([provider])
+  @@index([status])
+  @@map("marketplace_connections")
+}
+
+model MarketplaceOrder {
+  id              String                 @id @default(uuid())
+  merchantId      String
+  connectionId    String
+  provider        MarketplaceProvider
+  externalOrderId String
+  orderNumber     String
+  status          MarketplaceOrderStatus
+  customerName    String?
+  productName     String?
+  quantity        Int                    @default(1)
+  grossAmount     Decimal                @db.Decimal(18, 2)
+  commission      Decimal                @default(0) @db.Decimal(18, 2)
+  shippingCost    Decimal                @default(0) @db.Decimal(18, 2)
+  netAmount       Decimal                @db.Decimal(18, 2)
+  currency        String                 @default("TRY")
+  orderDate       DateTime
+  shippedDate     DateTime?
+  deliveredDate   DateTime?
+  matchedTxnId    String?
+  providerData    Json?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  merchant        Merchant               @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  connection      MarketplaceConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, externalOrderId])
+  @@index([merchantId])
+  @@index([provider])
+  @@index([status])
+  @@index([orderDate(sort: Desc)])
+  @@index([matchedTxnId])
+  @@map("marketplace_orders")
+}
+
+model MarketplaceSettlement {
+  id                   String                      @id @default(uuid())
+  merchantId           String
+  connectionId         String
+  provider             MarketplaceProvider
+  externalSettlementId String
+  periodStart          DateTime
+  periodEnd            DateTime
+  grossSales           Decimal                     @default(0) @db.Decimal(18, 2)
+  totalCommission      Decimal                     @default(0) @db.Decimal(18, 2)
+  totalShipping        Decimal                     @default(0) @db.Decimal(18, 2)
+  totalReturns         Decimal                     @default(0) @db.Decimal(18, 2)
+  netPayout            Decimal                     @db.Decimal(18, 2)
+  currency             String                      @default("TRY")
+  status               MarketplaceSettlementStatus @default(PENDING)
+  expectedPayoutDate   DateTime?
+  actualPayoutDate     DateTime?
+  matchedTxnId         String?
+  discrepancy          Decimal?                    @db.Decimal(18, 2)
+  orderCount           Int                         @default(0)
+  providerData         Json?
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  merchant             Merchant                    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  connection           MarketplaceConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, externalSettlementId])
+  @@index([merchantId])
+  @@index([provider])
+  @@index([status])
+  @@index([periodStart(sort: Desc)])
+  @@map("marketplace_settlements")
 }
 
 model Customer {
@@ -806,13 +939,13 @@ model Campaign {
   name            String
   type            String
   subject         String?
-  content         String?        // الحقل القديم — احتفظنا به
-  body            String?        // الحقل الجديد — للـ controller الجديد
-  targetTags      String[]       // الحقل القديم — احتفظنا به
+  content         String? // الحقل القديم — احتفظنا به
+  body            String? // الحقل الجديد — للـ controller الجديد
+  targetTags      String[] // الحقل القديم — احتفظنا به
   targetSegment   String         @default("ALL") // الحقل الجديد
-  discountPercent Float?         // جديد
-  startDate       DateTime?      // جديد
-  endDate         DateTime?      // جديد
+  discountPercent Float? // جديد
+  startDate       DateTime? // جديد
+  endDate         DateTime? // جديد
   status          CampaignStatus @default(DRAFT)
   sentCount       Int            @default(0)
   openCount       Int            @default(0)
@@ -833,13 +966,13 @@ model TeamMember {
   merchantId   String
   name         String
   email        String
-  passwordHash String?   // optional — يُعبأ بعد قبول الدعوة
+  passwordHash String? // optional — يُعبأ بعد قبول الدعوة
   role         String    @default("MEMBER")
   permissions  Json      @default("{}")
   isActive     Boolean   @default(true)
   status       String    @default("PENDING") // جديد: PENDING | ACTIVE | DISABLED
-  inviteToken  String?   @unique             // جديد
-  inviteExpiry DateTime?                     // جديد
+  inviteToken  String?   @unique // جديد
+  inviteExpiry DateTime? // جديد
   lastActiveAt DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -903,7 +1036,7 @@ model PaymentLink {
 model OtpCode {
   id         String   @id @default(uuid())
   merchantId String
-  code       String   // مخزن كـ SHA-256 hash
+  code       String // مخزن كـ SHA-256 hash
   channel    String   @default("EMAIL") // EMAIL | SMS
   expiresAt  DateTime
   used       Boolean  @default(false)
@@ -1001,25 +1134,25 @@ model FactoringRequest {
 }
 
 model StockItem {
-  id          String    @id @default(uuid())
+  id          String          @id @default(uuid())
   merchantId  String
   name        String
   sku         String?
   barcode     String?
   category    String?
-  unit        String    @default("adet")
-  quantity    Decimal   @default(0) @db.Decimal(18, 3)
-  minQuantity Decimal   @default(0) @db.Decimal(18, 3)
-  costPrice   Decimal?  @db.Decimal(18, 2)
-  salePrice   Decimal?  @db.Decimal(18, 2)
-  vatRate     Decimal   @default(20) @db.Decimal(5, 2)
-  currency    String    @default("TRY")
+  unit        String          @default("adet")
+  quantity    Decimal         @default(0) @db.Decimal(18, 3)
+  minQuantity Decimal         @default(0) @db.Decimal(18, 3)
+  costPrice   Decimal?        @db.Decimal(18, 2)
+  salePrice   Decimal?        @db.Decimal(18, 2)
+  vatRate     Decimal         @default(20) @db.Decimal(5, 2)
+  currency    String          @default("TRY")
   location    String?
   description String?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  merchant    Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  merchant    Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   movements   StockMovement[]
 
   @@unique([merchantId, sku])
@@ -1044,20 +1177,20 @@ model StockMovement {
 }
 
 model InstallmentPlan {
-  id               String    @id @default(uuid())
+  id               String        @id @default(uuid())
   merchantId       String
-  invoiceId        String    @unique
+  invoiceId        String        @unique
   customerName     String
   customerPhone    String?
-  totalAmount      Decimal   @db.Decimal(18, 2)
-  currency         String    @default("TRY")
+  totalAmount      Decimal       @db.Decimal(18, 2)
+  currency         String        @default("TRY")
   installmentCount Int
   firstDueDate     DateTime
   notes            String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  merchant         Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  invoice          Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  merchant         Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  invoice          Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   installments     Installment[]
 
   @@map("installment_plans")
@@ -1197,51 +1330,6 @@ model RecurringInvoice {
   merchant      Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@map("recurring_invoices")
-}
-
-model MarketplaceOrder {
-  id              String             @id @default(uuid())
-  merchantId      String
-  channel         MarketplaceChannel
-  externalOrderId String
-  customerName    String
-  customerPhone   String?
-  items           Json
-  subtotal        Decimal            @db.Decimal(18, 2)
-  commission      Decimal            @default(0) @db.Decimal(18, 2)
-  shippingCost    Decimal            @default(0) @db.Decimal(18, 2)
-  total           Decimal            @db.Decimal(18, 2)
-  currency        String             @default("TRY")
-  status          String             @default("NEW")
-  orderDate       DateTime
-  shipDate        DateTime?
-  deliveryDate    DateTime?
-  trackingNumber  String?
-  invoiceId       String?
-  syncedAt        DateTime           @default(now())
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  merchant        Merchant           @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-
-  @@unique([merchantId, channel, externalOrderId])
-  @@map("marketplace_orders")
-}
-
-model MarketplaceIntegration {
-  id         String             @id @default(uuid())
-  merchantId String
-  channel    MarketplaceChannel
-  apiKey     String?
-  apiSecret  String?
-  supplierId String?
-  isActive   Boolean            @default(true)
-  lastSyncAt DateTime?
-  settings   Json               @default("{}")
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
-
-  @@unique([merchantId, channel])
-  @@map("marketplace_integrations")
 }
 
 model TaxEvent {

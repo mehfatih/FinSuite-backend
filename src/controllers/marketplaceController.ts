@@ -1,291 +1,227 @@
-// ================================================================
-// Zyrix FinSuite — Pazar Yeri Entegrasyonu Controller (Feature 13)
-// Trendyol / Hepsiburada sipariş senkronizasyonu
-// ================================================================
-import { Response, RequestHandler } from "express";
-import { pid } from "../utils/params";
+// ============================================================
+// Zyrix FinSuite - Marketplace Controller
+// Track C - Sprint 2 Feature 4
+//
+// Endpoints (all authenticated):
+//   GET    /api/marketplace/providers       list all 20 providers
+//   POST   /api/marketplace/connect         create/update connection
+//   GET    /api/marketplace/connections     list all merchant connections
+//   POST   /api/marketplace/sync/:id        trigger sync for one connection
+//   POST   /api/marketplace/sync-all        sync all connected providers
+//   GET    /api/marketplace/orders          list orders (filter by provider/status)
+//   GET    /api/marketplace/settlements     list settlements (filter by provider)
+//   DELETE /api/marketplace/connection/:id  disconnect one provider
+// ============================================================
+
+import { Request, Response } from "express";
+import { z } from "zod";
 import { prisma } from "../config/database";
-import { AuthenticatedRequest } from "../types";
+import { syncMarketplaceConnection } from "../services/marketplaceReconciliationService";
+import { listProviders, getProvider } from "../services/marketplaceCatalog";
+import { pid } from "../utils/params";
 
-const h = (fn: Function): RequestHandler => fn as RequestHandler;
+interface AuthenticatedRequest extends Request {
+  merchant?: { id: string; email: string; plan?: string };
+}
 
-// ── Trendyol Real API ─────────────────────────────────────────
-async function fetchTrendyolOrders(supplierId: string, apiKey: string, apiSecret: string): Promise<any[]> {
-  if (!supplierId || !apiKey || !apiSecret) {
-    // Sandbox — demo siparişler döndür
-    return [
-      {
-        id: `TY-DEMO-${Date.now()}`,
-        orderNumber: `TY2026${Math.floor(Math.random() * 100000)}`,
-        customerFirstName: "Demo",
-        customerLastName: "Müşteri",
-        grossAmount: 299.90,
-        totalDiscount: 0,
-        lines: [
-          { productName: "Demo Ürün A", barcode: "BAR001", quantity: 2, price: 149.95, amount: 299.90 },
-        ],
-        orderDate: Date.now(),
-        status: "Created",
-        shipmentPackages: [],
-      },
-    ];
+const VALID_PROVIDERS = [
+  "TRENDYOL","HEPSIBURADA","N11","CICEKSEPETI","PTTAVM",
+  "AMAZON_TR","GETIR","FLO","YEMEKSEPETI","VATAN",
+  "SALLA","ZID","NOON_SA","AMAZON_SA","JARIR",
+  "AMAZON_AE","NOON_AE","NAMSHI","CARREFOUR_AE","MUMZWORLD",
+] as const;
+
+const connectSchema = z.object({
+  provider: z.enum(VALID_PROVIDERS),
+  sellerId: z.string().trim().min(1).max(100),
+  storeName: z.string().trim().max(200).optional(),
+  apiKey: z.string().trim().min(1).max(300).optional(),
+  apiSecret: z.string().trim().min(1).max(300).optional(),
+  region: z.string().trim().max(50).optional(),
+});
+
+function ok(res: Response, data: any, status = 200) {
+  return res.status(status).json({ success: true, data });
+}
+function fail(res: Response, status: number, error: string) {
+  return res.status(status).json({ success: false, error });
+}
+
+// ----------------------------------------------------------------
+// GET /providers
+// ----------------------------------------------------------------
+
+export async function providersHandler(_req: Request, res: Response) {
+  return ok(res, listProviders());
+}
+
+// ----------------------------------------------------------------
+// POST /connect
+// ----------------------------------------------------------------
+
+export async function connectHandler(req: AuthenticatedRequest, res: Response) {
+  if (!req.merchant?.id) return fail(res, 401, "Not authenticated");
+
+  const parsed = connectSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return fail(res, 400, parsed.error.errors[0]?.message || "Invalid input");
   }
+  const input = parsed.data;
+
+  const cfg = getProvider(input.provider);
+  if (!cfg) return fail(res, 400, "Unknown provider");
 
   try {
-    // Trendyol Partner API v2
-    const credentials = Buffer.from(`${supplierId}:${apiKey}:${apiSecret}`).toString("base64");
-
-    // Son 7 günün siparişleri
-    const endDate   = Date.now();
-    const startDate = endDate - 7 * 24 * 60 * 60 * 1000;
-
-    const params = new URLSearchParams({
-      startDate: String(startDate),
-      endDate:   String(endDate),
-      page:      "0",
-      size:      "50",
-      status:    "Created",
+    const upserted = await prisma.marketplaceConnection.upsert({
+      where: {
+        merchantId_provider: {
+          merchantId: req.merchant.id,
+          provider: input.provider as any,
+        },
+      },
+      create: {
+        merchantId: req.merchant.id,
+        provider: input.provider as any,
+        sellerId: input.sellerId,
+        apiKey: input.apiKey || null,
+        apiSecret: input.apiSecret || null,
+        storeName: input.storeName || null,
+        region: input.region || cfg.country,
+        status: "CONNECTED" as any,
+      } as any,
+      update: {
+        sellerId: input.sellerId,
+        apiKey: input.apiKey || null,
+        apiSecret: input.apiSecret || null,
+        storeName: input.storeName || null,
+        region: input.region || cfg.country,
+        status: "CONNECTED" as any,
+      } as any,
     });
-
-    const response = await fetch(
-      `https://api.trendyol.com/sapigw/suppliers/${supplierId}/orders?${params}`,
-      {
-        headers: {
-          "Authorization": `Basic ${credentials}`,
-          "User-Agent":    `${supplierId} - ZyrixFinSuite/3.0`,
-          "Content-Type":  "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`[Trendyol] API ${response.status}:`, errText);
-      return [];
-    }
-
-    const data = await response.json();
-    return (data as any)?.content || [];
+    return ok(res, upserted, 201);
   } catch (err) {
-    console.error("[Trendyol] Fetch error:", err);
-    return [];
+    return fail(res, 500, "Failed to connect");
   }
 }
 
-// ── Hepsiburada Real API ──────────────────────────────────────
-async function fetchHepsiburadaOrders(apiKey: string, apiSecret?: string): Promise<any[]> {
-  if (!apiKey || !apiSecret) {
-    // Sandbox — demo siparişler döndür
-    return [
-      {
-        id: `HB-DEMO-${Date.now()}`,
-        orderNumber: `HB2026${Math.floor(Math.random() * 100000)}`,
-        customerName: "Demo HB Müşteri",
-        totalPrice: 459.00,
-        lines: [{ name: "Demo Ürün B", quantity: 1, price: 459.00 }],
-        orderDate: new Date().toISOString(),
-        status: "New",
-      },
-    ];
-  }
+// ----------------------------------------------------------------
+// GET /connections
+// ----------------------------------------------------------------
 
-  try {
-    const credentials = Buffer.from(`${apiKey}:${apiSecret}`).toString("base64");
+export async function connectionsHandler(req: AuthenticatedRequest, res: Response) {
+  if (!req.merchant?.id) return fail(res, 401, "Not authenticated");
 
-    const response = await fetch(
-      "https://listing-external.hepsiburada.com/listings/merchantlisting/allorders",
-      {
-        headers: {
-          "Authorization": `Basic ${credentials}`,
-          "Content-Type":  "application/json",
-          "Accept":        "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) return [];
-    const data = await response.json();
-    return (data as any)?.items || (data as any)?.orders || [];
-  } catch (err) {
-    console.error("[Hepsiburada] Fetch error:", err);
-    return [];
-  }
+  const rows = await prisma.marketplaceConnection.findMany({
+    where: { merchantId: req.merchant.id },
+    orderBy: { createdAt: "asc" },
+  });
+  return ok(res, rows);
 }
 
-export const marketplaceController = {
+// ----------------------------------------------------------------
+// POST /sync/:id
+// ----------------------------------------------------------------
 
-  // ── GET /api/marketplace/orders
-  listOrders: h(async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { channel, status, page = "1", limit = "30" } = req.query;
-      const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
-      const where: any = { merchantId: req.merchant!.id };
-      if (channel) where.channel = channel;
-      if (status) where.status = status;
+export async function syncOneHandler(req: AuthenticatedRequest, res: Response) {
+  if (!req.merchant?.id) return fail(res, 401, "Not authenticated");
 
-      const [orders, total] = await Promise.all([
-        prisma.marketplaceOrder.findMany({ where, skip, take: parseInt(limit as string), orderBy: { orderDate: "desc" } }),
-        prisma.marketplaceOrder.count({ where }),
-      ]);
+  const id = pid(req.params.id);
+  if (!id) return fail(res, 400, "id required");
 
-      const stats = await prisma.marketplaceOrder.groupBy({
-        by: ["channel"],
-        where: { merchantId: req.merchant!.id },
-        _count: true,
-        _sum: { total: true },
-      });
+  const conn = await prisma.marketplaceConnection.findFirst({
+    where: { id, merchantId: req.merchant.id },
+  });
+  if (!conn) return fail(res, 404, "Connection not found");
 
-      res.json({ success: true, data: { orders, total, stats } });
-    } catch { res.status(500).json({ success: false, error: "Siparişler alınamadı" }); }
-  }),
+  const result = await syncMarketplaceConnection(conn.id);
+  if (!result.success) return fail(res, 502, result.error || "Sync failed");
+  return ok(res, result);
+}
 
-  // ── POST /api/marketplace/sync/:channel — senkronize et
-  sync: h(async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { channel } = req.params;
-      const merchantId = req.merchant!.id;
+// ----------------------------------------------------------------
+// POST /sync-all
+// ----------------------------------------------------------------
 
-      const integration = await prisma.marketplaceIntegration.findUnique({
-        where: { merchantId_channel: { merchantId, channel: channel as any } },
-      });
+export async function syncAllHandler(req: AuthenticatedRequest, res: Response) {
+  if (!req.merchant?.id) return fail(res, 401, "Not authenticated");
 
-      let rawOrders: any[] = [];
-      if (channel === "TRENDYOL") {
-        rawOrders = await fetchTrendyolOrders(
-          integration?.supplierId || "",
-          integration?.apiKey    || "",
-          integration?.apiSecret || ""
-        );
-      } else if (channel === "HEPSIBURADA") {
-        rawOrders = await fetchHepsiburadaOrders(
-          integration?.apiKey    || "",
-          integration?.apiSecret || ""
-        );
-      }
+  const conns = await prisma.marketplaceConnection.findMany({
+    where: { merchantId: req.merchant.id, status: "CONNECTED" as any },
+  });
 
-      let created = 0, updated = 0;
-      for (const o of rawOrders) {
-        const externalId    = String(o.id || o.orderNumber);
-        const total         = o.grossAmount || o.totalPrice || 0;
-        const customerName  = o.customerFirstName
-          ? `${o.customerFirstName} ${o.customerLastName}`
-          : o.customerName || "Bilinmiyor";
-        const items         = o.lines?.map((l: any) => ({
-          name: l.productName || l.name,
-          quantity: l.quantity,
-          price: l.price,
-        })) || [];
-        const commission    = total * 0.15;
+  const results = [];
+  for (const c of conns) {
+    const r = await syncMarketplaceConnection(c.id);
+    results.push({ provider: c.provider, ...r });
+  }
 
-        const existing = await prisma.marketplaceOrder.findUnique({
-          where: { merchantId_channel_externalOrderId: { merchantId, channel: channel as any, externalOrderId: externalId } },
-        });
+  const totals = results.reduce((acc, r) => ({
+    ordersInserted: acc.ordersInserted + (r.ordersInserted || 0),
+    settlementsInserted: acc.settlementsInserted + (r.settlementsInserted || 0),
+    reconciledCount: acc.reconciledCount + (r.reconciledCount || 0),
+  }), { ordersInserted: 0, settlementsInserted: 0, reconciledCount: 0 });
 
-        if (existing) {
-          await prisma.marketplaceOrder.update({
-            where: { id: existing.id },
-            data:  { status: o.status, syncedAt: new Date() },
-          });
-          updated++;
-        } else {
-          await prisma.marketplaceOrder.create({
-            data: {
-              merchantId, channel: channel as any,
-              externalOrderId: externalId,
-              customerName, items,
-              subtotal:     total - commission,
-              commission,
-              shippingCost: 0,
-              total,
-              status:    o.status || "NEW",
-              orderDate: new Date(o.orderDate),
-            },
-          });
-          created++;
-        }
-      }
+  return ok(res, { results, totals, connectionsProcessed: conns.length });
+}
 
-      if (integration) {
-        await prisma.marketplaceIntegration.update({
-          where: { id: integration.id },
-          data:  { lastSyncAt: new Date() },
-        });
-      }
+// ----------------------------------------------------------------
+// GET /orders
+// ----------------------------------------------------------------
 
-      res.json({
-        success: true,
-        data:    { created, updated, total: rawOrders.length },
-        message: `${channel}: ${created} yeni, ${updated} güncellendi`,
-      });
-    } catch { res.status(500).json({ success: false, error: "Senkronizasyon başarısız" }); }
-  }),
+export async function ordersHandler(req: AuthenticatedRequest, res: Response) {
+  if (!req.merchant?.id) return fail(res, 401, "Not authenticated");
 
-  // ── POST /api/marketplace/integrations — entegrasyon kaydet
-  saveIntegration: h(async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { channel, apiKey, apiSecret, supplierId } = req.body;
-      if (!channel) return res.status(400).json({ success: false, error: "Kanal zorunlu" });
+  const provider = String(req.query.provider || "");
+  const status = String(req.query.status || "");
 
-      const integration = await prisma.marketplaceIntegration.upsert({
-        where:  { merchantId_channel: { merchantId: req.merchant!.id, channel } },
-        create: { merchantId: req.merchant!.id, channel, apiKey, apiSecret, supplierId },
-        update: { apiKey, apiSecret, supplierId, isActive: true },
-      });
-      res.json({ success: true, data: integration });
-    } catch { res.status(500).json({ success: false, error: "Entegrasyon kaydedilemedi" }); }
-  }),
+  const where: any = { merchantId: req.merchant.id };
+  if (provider) where.provider = provider;
+  if (status) where.status = status;
 
-  // ── GET /api/marketplace/integrations
-  listIntegrations: h(async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const integrations = await prisma.marketplaceIntegration.findMany({
-        where: { merchantId: req.merchant!.id },
-      });
-      const safe = integrations.map(i => ({
-        ...i,
-        apiKey:    i.apiKey    ? `${i.apiKey.slice(0, 4)}...`    : null,
-        apiSecret: i.apiSecret ? "***" : null,
-      }));
-      res.json({ success: true, data: safe });
-    } catch { res.status(500).json({ success: false, error: "Entegrasyonlar alınamadı" }); }
-  }),
+  const [rows, total] = await Promise.all([
+    prisma.marketplaceOrder.findMany({
+      where,
+      orderBy: { orderDate: "desc" },
+      take: 100,
+    }),
+    prisma.marketplaceOrder.count({ where }),
+  ]);
 
-  // ── POST /api/marketplace/orders/:id/create-invoice — sipariş → fatura
-  createInvoice: h(async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const order = await prisma.marketplaceOrder.findFirst({
-        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
-      });
-      if (!order) return res.status(404).json({ success: false, error: "Sipariş bulunamadı" });
-      if (order.invoiceId) return res.status(409).json({ success: false, error: "Bu sipariş için zaten fatura var" });
+  return ok(res, { rows, total });
+}
 
-      const count         = await prisma.invoice.count({ where: { merchantId: req.merchant!.id } });
-      const invoiceNumber = `MKT-${new Date().getFullYear()}-${String(count + 1).padStart(4, "0")}`;
-      const vatAmount     = Number(order.subtotal) * 0.20;
+// ----------------------------------------------------------------
+// GET /settlements
+// ----------------------------------------------------------------
 
-      const invoice = await prisma.invoice.create({
-        data: {
-          merchantId:   req.merchant!.id,
-          invoiceNumber,
-          customerName: order.customerName,
-          items:        order.items,
-          subtotal:     order.subtotal,
-          vatRate:      20,
-          vatAmount,
-          total:        Number(order.subtotal) + vatAmount,
-          currency:     order.currency,
-          status:       "SENT",
-          dueDate:      new Date(Date.now() + 30 * 86400000),
-          notes:        `${order.channel} Sipariş: ${order.externalOrderId}`,
-        },
-      });
+export async function settlementsHandler(req: AuthenticatedRequest, res: Response) {
+  if (!req.merchant?.id) return fail(res, 401, "Not authenticated");
 
-      await prisma.marketplaceOrder.update({
-        where: { id: order.id },
-        data:  { invoiceId: invoice.id },
-      });
+  const provider = String(req.query.provider || "");
+  const where: any = { merchantId: req.merchant.id };
+  if (provider) where.provider = provider;
 
-      res.json({ success: true, data: invoice });
-    } catch { res.status(500).json({ success: false, error: "Fatura oluşturulamadı" }); }
-  }),
-};
+  const rows = await prisma.marketplaceSettlement.findMany({
+    where,
+    orderBy: { periodStart: "desc" },
+    take: 100,
+  });
+
+  return ok(res, rows);
+}
+
+// ----------------------------------------------------------------
+// DELETE /connection/:id
+// ----------------------------------------------------------------
+
+export async function disconnectHandler(req: AuthenticatedRequest, res: Response) {
+  if (!req.merchant?.id) return fail(res, 401, "Not authenticated");
+
+  const id = pid(req.params.id);
+  if (!id) return fail(res, 400, "id required");
+
+  await prisma.marketplaceConnection.deleteMany({
+    where: { id, merchantId: req.merchant.id },
+  });
+  return ok(res, { disconnected: true });
+}
