@@ -147,6 +147,13 @@ enum BankConnectionStatus {
   ERROR
 }
 
+enum BankCsvImportStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
 enum BankTxnDirection {
   IN
   OUT
@@ -359,6 +366,7 @@ model Merchant {
   receiptScans           ReceiptScan[]
   whatsappMessages       WhatsAppMessage[]
   bankConnections        BankConnection[]
+  bankCsvImports         BankCsvImport[]
   bankTransactions       BankTransaction[]
   cashCrisisAlerts       CashCrisisAlert[]
   trendyolConnection     TrendyolConnection?
@@ -525,6 +533,28 @@ model WhatsAppMessage {
   @@index([invoiceId])
   @@index([status])
   @@map("whatsapp_messages")
+}
+
+model BankCsvImport {
+  id            String              @id @default(uuid())
+  merchantId    String
+  connectionId  String?
+  filename      String
+  bankCode      String
+  status        BankCsvImportStatus @default(PROCESSING)
+  totalRows     Int                 @default(0)
+  insertedRows  Int                 @default(0)
+  duplicateRows Int                 @default(0)
+  errorRows     Int                 @default(0)
+  errorDetails  Json?
+  startedAt     DateTime            @default(now())
+  completedAt   DateTime?
+  merchant      Merchant            @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("bank_csv_imports")
 }
 
 model BankConnection {

@@ -15,6 +15,7 @@ import { z } from "zod";
 import { prisma } from "../config/database";
 import { listBankProviders } from "../services/bankProviderRegistry";
 import { syncConnection } from "../services/bankSyncService";
+import { importCsvForMerchant, listCsvImports } from "../services/bankCsvImportService";
 
 interface AuthenticatedRequest extends Request {
   merchant?: { id: string; email: string; plan?: string };
@@ -160,4 +161,55 @@ export async function transactionsHandler(req: AuthenticatedRequest, res: Respon
   ]);
 
   return ok(res, { rows, total });
+}
+
+
+// ----------------------------------------------------------------
+// POST /api/banks/import-csv - upload CSV bank statement
+// Body: { csvText: string, filename: string, connectionId?: string }
+// ----------------------------------------------------------------
+
+const importCsvSchema = z.object({
+  csvText: z.string().min(20).max(20 * 1024 * 1024), // 20MB max
+  filename: z.string().trim().min(1).max(200),
+  connectionId: z.string().uuid().optional(),
+});
+
+export async function importCsvHandler(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  if (!req.merchant?.id) return fail(res, 401, "Not authenticated");
+
+  const parsed = importCsvSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return fail(res, 400, parsed.error.errors[0]?.message || "Invalid input");
+  }
+  const { csvText, filename, connectionId } = parsed.data;
+
+  try {
+    const result = await importCsvForMerchant({
+      merchantId: req.merchant.id,
+      filename,
+      csvText,
+      connectionId,
+    });
+    return ok(res, result, 201);
+  } catch (err: any) {
+    return fail(res, 422, err?.message || "CSV import failed");
+  }
+}
+
+// ----------------------------------------------------------------
+// GET /api/banks/imports - list past CSV imports
+// ----------------------------------------------------------------
+
+export async function listImportsHandler(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  if (!req.merchant?.id) return fail(res, 401, "Not authenticated");
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+  const rows = await listCsvImports(req.merchant.id, limit);
+  return ok(res, { rows, total: rows.length });
 }

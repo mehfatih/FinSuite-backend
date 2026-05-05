@@ -11,6 +11,8 @@ import {
   connectionsHandler,
   syncHandler,
   transactionsHandler,
+  importCsvHandler,
+  listImportsHandler,
 } from "../controllers/bankController";
 
 const router = Router();
@@ -22,5 +24,7 @@ router.post("/connect",                    connectHandler as any);
 router.get("/connections",                 connectionsHandler as any);
 router.post("/connections/:id/sync",       syncHandler as any);
 router.get("/transactions",                transactionsHandler as any);
+router.post("/import-csv",                 importCsvHandler as any);
+router.get("/imports",                     listImportsHandler as any);
 
 export default router;
