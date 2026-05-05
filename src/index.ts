@@ -38,6 +38,7 @@ import benchmarkRoutes     from "./routes/benchmark";
 import cronRoutes 	   from "./routes/cronRoutes";
 import plansRoutes from "./routes/plans";
 import eIrsaliyeRoutes from "./routes/eIrsaliye";
+import receiptScansRoutes from "./routes/receiptScans";
 import { publicProfileController } from "./controllers/publicProfileController";
 // v4
 import invoicePdfRoutes from './routes/invoicePdfRoutes';
@@ -90,6 +91,7 @@ app.use("/api/tax-calendar",   taxCalendarRoutes);
 app.use("/api/benchmark",      benchmarkRoutes);
 app.use("/api/plans", plansRoutes);
 app.use("/api/eirsaliye", eIrsaliyeRoutes);
+app.use("/api/receipts", receiptScansRoutes);
 app.use('/api/cron',           cronRoutes);
 // v4
 app.use('/api/invoices',   invoicePdfRoutes);  // يضيف /:id/pdf على الـ invoices الموجود
@@ -104,8 +106,8 @@ app.use(errorHandler);
 
 async function bootstrap(): Promise<void> {
   app.listen(env.port, () => {
-    console.log(`\n🚀 Zyrix FinSuite v3.2 — port ${env.port}`);
-    console.log(`✨ 17 features | 27 routes active\n`);
+    console.log(`\n🚀 Zyrix FinSuite v3.3 — port ${env.port}`);
+    console.log(`✨ 18 features | 28 routes active\n`);
   });
   try { await prisma.$connect(); console.log("✅ Database connected"); }
   catch (err) { console.error("❌ Database error:", err); }
