@@ -3,7 +3,7 @@ import { env } from "../config/env";
 
 const resend = new Resend(env.resendApiKey);
 
-const FROM = "Zyrix FinSuite <noreply@zyrix.co>";
+const FROM = "Zyrix FinSuite <hello@zyrix.co>";
 
 // ── Welcome Email ─────────────────────────────────
 export async function sendWelcomeEmail(opts: {
@@ -187,3 +187,24 @@ export async function sendSuspensionWarning(opts: {
     `,
   });
 }
+
+// ============================================================
+// Stage 8 Phase B: generic raw-HTML send
+// Used by the auto-provisioning flow to dispatch trilingual
+// welcome emails rendered in src/services/emailTemplates.ts
+// ============================================================
+export async function sendRawEmail(opts: {
+  to: string;
+  subject: string;
+  html: string;
+  from?: string;
+}) {
+  const result = await resend.emails.send({
+    from: opts.from || FROM,
+    to: opts.to,
+    subject: opts.subject,
+    html: opts.html,
+  });
+  return result;
+}
+
