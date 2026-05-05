@@ -154,6 +154,39 @@ enum BankCsvImportStatus {
   PARTIAL
 }
 
+enum UserRole {
+  OWNER
+  ADMIN
+  MANAGER
+  ACCOUNTANT
+  STAFF
+  VIEWER
+}
+
+enum AuditActionType {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  PERMISSION_CHANGE
+  SUBSCRIPTION_CHANGE
+  CONNECTION_CONNECT
+  CONNECTION_DISCONNECT
+  WEBHOOK_RECEIVED
+  CRON_RUN
+  ERROR
+}
+
+enum IpAllowlistMode {
+  DISABLED
+  ALLOWLIST
+  BLOCKLIST
+}
+
 enum BankTxnDirection {
   IN
   OUT
@@ -367,6 +400,10 @@ model Merchant {
   whatsappMessages       WhatsAppMessage[]
   bankConnections        BankConnection[]
   bankCsvImports         BankCsvImport[]
+  merchantUsers          MerchantUser[]
+  merchantAuditLogs      MerchantAuditLog[]
+  ipAllowlistEntries     IpAllowlistEntry[]
+  ipAllowlistConfig      IpAllowlistConfig?
   bankTransactions       BankTransaction[]
   cashCrisisAlerts       CashCrisisAlert[]
   trendyolConnection     TrendyolConnection?
@@ -555,6 +592,78 @@ model BankCsvImport {
   @@index([status])
   @@index([startedAt])
   @@map("bank_csv_imports")
+}
+
+model MerchantUser {
+  id           String    @id @default(uuid())
+  merchantId   String
+  email        String
+  passwordHash String
+  name         String
+  role         UserRole  @default(STAFF)
+  isActive     Boolean   @default(true)
+  invitedBy    String?
+  acceptedAt   DateTime?
+  lastLoginAt  DateTime?
+  permissions  Json      @default("{}")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  merchant     Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantId, email])
+  @@index([merchantId])
+  @@index([role])
+  @@map("merchant_users")
+}
+
+model MerchantAuditLog {
+  id           String          @id @default(uuid())
+  merchantId   String
+  userId       String?
+  userEmail    String?
+  action       AuditActionType
+  resource     String
+  resourceId   String?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  success      Boolean         @default(true)
+  errorMessage String?
+  createdAt    DateTime        @default(now())
+  merchant     Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("merchant_audit_logs")
+}
+
+model IpAllowlistEntry {
+  id          String   @id @default(uuid())
+  merchantId  String
+  ipAddress   String
+  description String?
+  isActive    Boolean  @default(true)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  merchant    Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantId, ipAddress])
+  @@index([merchantId])
+  @@map("ip_allowlist_entries")
+}
+
+model IpAllowlistConfig {
+  id         String          @id @default(uuid())
+  merchantId String          @unique
+  mode       IpAllowlistMode @default(DISABLED)
+  enforceFor Json            @default("[]")
+  updatedAt  DateTime        @updatedAt
+  merchant   Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("ip_allowlist_config")
 }
 
 model BankConnection {
