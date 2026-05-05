@@ -68,7 +68,7 @@ async function callAnthropicAPI(messages: Array<{ role: string; content: string 
     }
 
     const data = await response.json();
-    return data.content?.[0]?.text || "Yanıt alınamadı.";
+    return (data as any).content?.[0]?.text || "Yanıt alınamadı.";
   } catch (err) {
     console.error("[AI Assistant] fetch error:", err);
     return generateLocalResponse(messages[messages.length - 1]?.content || "");

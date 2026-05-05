@@ -93,7 +93,7 @@ export async function sendWhatsAppMessage(
       body: JSON.stringify(body),
     });
 
-    const json = await resp.json().catch(() => ({}));
+    const json: any = await resp.json().catch(() => ({}));
 
     if (!resp.ok) {
       return {

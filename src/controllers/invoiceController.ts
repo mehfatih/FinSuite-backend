@@ -1,4 +1,5 @@
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -36,7 +37,7 @@ export const invoiceController = {
   getById: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const invoice = await prisma.invoice.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id }
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id }
       });
       if (!invoice) { res.status(404).json({ success: false, error: "Invoice not found" }); return; }
       res.status(200).json({ success: true, data: invoice });
@@ -82,7 +83,7 @@ export const invoiceController = {
   update: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const existing = await prisma.invoice.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id }
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id }
       });
       if (!existing) { res.status(404).json({ success: false, error: "Invoice not found" }); return; }
 
@@ -93,7 +94,7 @@ export const invoiceController = {
       const total = subtotal !== undefined && vatAmount !== undefined ? subtotal + vatAmount : undefined;
 
       const invoice = await prisma.invoice.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: {
           ...(customerName && { customerName }),
           ...(customerEmail !== undefined && { customerEmail }),
@@ -115,12 +116,12 @@ export const invoiceController = {
   markPaid: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const existing = await prisma.invoice.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id }
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id }
       });
       if (!existing) { res.status(404).json({ success: false, error: "Invoice not found" }); return; }
 
       const invoice = await prisma.invoice.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { status: "PAID", paidDate: new Date() },
       });
       res.status(200).json({ success: true, data: invoice });
@@ -132,11 +133,11 @@ export const invoiceController = {
   delete: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const existing = await prisma.invoice.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id }
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id }
       });
       if (!existing) { res.status(404).json({ success: false, error: "Invoice not found" }); return; }
 
-      await prisma.invoice.delete({ where: { id: req.params.id } });
+      await prisma.invoice.delete({ where: { id: pid(req.params.id) } });
       res.status(200).json({ success: true, message: "Invoice deleted" });
     } catch (err) {
       res.status(500).json({ success: false, error: "Failed to delete invoice" });

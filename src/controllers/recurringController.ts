@@ -3,6 +3,7 @@
 // Otomatik tekrarlayan fatura oluşturma
 // ================================================================
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -70,10 +71,10 @@ export const recurringController = {
 
   update: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const existing = await prisma.recurringInvoice.findFirst({ where: { id: req.params.id, merchantId: req.merchant!.id } });
+      const existing = await prisma.recurringInvoice.findFirst({ where: { id: pid(req.params.id), merchantId: req.merchant!.id } });
       if (!existing) return res.status(404).json({ success: false, error: "Plan bulunamadı" });
       const { status } = req.body;
-      const updated = await prisma.recurringInvoice.update({ where: { id: req.params.id }, data: { status } });
+      const updated = await prisma.recurringInvoice.update({ where: { id: pid(req.params.id) }, data: { status } });
       res.json({ success: true, data: updated });
     } catch { res.status(500).json({ success: false, error: "Güncelleme başarısız" }); }
   }),
@@ -81,7 +82,7 @@ export const recurringController = {
   // ── POST /api/recurring/:id/run — manuel tetikle
   runNow: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const recurring = await prisma.recurringInvoice.findFirst({ where: { id: req.params.id, merchantId: req.merchant!.id } });
+      const recurring = await prisma.recurringInvoice.findFirst({ where: { id: pid(req.params.id), merchantId: req.merchant!.id } });
       if (!recurring) return res.status(404).json({ success: false, error: "Plan bulunamadı" });
       if (recurring.status !== "ACTIVE") return res.status(400).json({ success: false, error: "Plan aktif değil" });
 

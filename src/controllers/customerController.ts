@@ -1,4 +1,5 @@
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -41,7 +42,7 @@ export const customerController = {
   getById: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const customer = await prisma.customer.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
         include: {
           deals: { orderBy: { createdAt: "desc" }, take: 10 },
           tasks: { orderBy: { createdAt: "desc" }, take: 10 },
@@ -73,12 +74,12 @@ export const customerController = {
   update: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const existing = await prisma.customer.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id }
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id }
       });
       if (!existing) { res.status(404).json({ success: false, error: "Customer not found" }); return; }
 
       const customer = await prisma.customer.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: req.body,
       });
       res.status(200).json({ success: true, data: customer });
@@ -90,11 +91,11 @@ export const customerController = {
   delete: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const existing = await prisma.customer.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id }
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id }
       });
       if (!existing) { res.status(404).json({ success: false, error: "Customer not found" }); return; }
 
-      await prisma.customer.delete({ where: { id: req.params.id } });
+      await prisma.customer.delete({ where: { id: pid(req.params.id) } });
       res.status(200).json({ success: true, message: "Customer deleted" });
     } catch (err) {
       res.status(500).json({ success: false, error: "Failed to delete customer" });
@@ -104,13 +105,13 @@ export const customerController = {
   addLoyaltyPoints: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const existing = await prisma.customer.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id }
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id }
       });
       if (!existing) { res.status(404).json({ success: false, error: "Customer not found" }); return; }
 
       const { points } = req.body;
       const customer = await prisma.customer.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { loyaltyPoints: { increment: parseInt(points) } },
       });
       res.status(200).json({ success: true, data: customer });

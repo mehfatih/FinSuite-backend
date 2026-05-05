@@ -3,6 +3,7 @@
 // Türk vergi takvimi — otomatik hatırlatma + hazırlık takibi
 // ================================================================
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -115,11 +116,11 @@ export const taxCalendarController = {
   updateStatus: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { isPrepared, isSubmitted, amount, notes } = req.body;
-      const event = await prisma.taxEvent.findFirst({ where: { id: req.params.id, merchantId: req.merchant!.id } });
+      const event = await prisma.taxEvent.findFirst({ where: { id: pid(req.params.id), merchantId: req.merchant!.id } });
       if (!event) return res.status(404).json({ success: false, error: "Etkinlik bulunamadı" });
 
       const updated = await prisma.taxEvent.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: {
           ...(isPrepared !== undefined && { isPrepared }),
           ...(isSubmitted !== undefined && { isSubmitted, submittedAt: isSubmitted ? new Date() : null }),

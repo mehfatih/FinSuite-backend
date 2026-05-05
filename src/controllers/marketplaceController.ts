@@ -3,6 +3,7 @@
 // Trendyol / Hepsiburada sipariş senkronizasyonu
 // ================================================================
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -64,7 +65,7 @@ async function fetchTrendyolOrders(supplierId: string, apiKey: string, apiSecret
     }
 
     const data = await response.json();
-    return data?.content || [];
+    return (data as any)?.content || [];
   } catch (err) {
     console.error("[Trendyol] Fetch error:", err);
     return [];
@@ -104,7 +105,7 @@ async function fetchHepsiburadaOrders(apiKey: string, apiSecret?: string): Promi
 
     if (!response.ok) return [];
     const data = await response.json();
-    return data?.items || data?.orders || [];
+    return (data as any)?.items || (data as any)?.orders || [];
   } catch (err) {
     console.error("[Hepsiburada] Fetch error:", err);
     return [];
@@ -253,7 +254,7 @@ export const marketplaceController = {
   createInvoice: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
       const order = await prisma.marketplaceOrder.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
       });
       if (!order) return res.status(404).json({ success: false, error: "Sipariş bulunamadı" });
       if (order.invoiceId) return res.status(409).json({ success: false, error: "Bu sipariş için zaten fatura var" });

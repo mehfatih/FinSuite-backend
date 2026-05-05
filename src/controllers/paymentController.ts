@@ -181,13 +181,13 @@ export const initiate = h(async (req: AuthenticatedRequest, res: Response) => {
         registerCard:   '0',
       },
       buyer: {
-        id: merchant.id, name: merchant.name, surname: '',
-        gsmNumber: merchant.phone, email: merchant.email,
+        id: merchant.id, name: (merchant as any).name, surname: '',
+        gsmNumber: (merchant as any).phone, email: merchant.email,
         identityNumber: '11111111111', registrationAddress: 'Türkiye',
         ip: req.ip || '85.34.78.112', city: 'Istanbul', country: 'Turkey',
       },
-      shippingAddress: { contactName: merchant.name, city: 'Istanbul', country: 'Turkey', address: 'Türkiye' },
-      billingAddress:  { contactName: merchant.name, city: 'Istanbul', country: 'Turkey', address: 'Türkiye' },
+      shippingAddress: { contactName: (merchant as any).name, city: 'Istanbul', country: 'Turkey', address: 'Türkiye' },
+      billingAddress:  { contactName: (merchant as any).name, city: 'Istanbul', country: 'Turkey', address: 'Türkiye' },
       basketItems: [{
         id: `plan-${planId}`, name: `Zyrix FinSuite ${plan.name} Abonelik`,
         category1: 'Abonelik', itemType: 'VIRTUAL', price: String(plan.price),

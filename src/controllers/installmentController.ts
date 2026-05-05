@@ -2,6 +2,7 @@
 // Zyrix FinSuite — Taksit & Vade Takibi Controller (Feature 7)
 // ================================================================
 import { Response, RequestHandler } from "express";
+import { pid, qs } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -80,23 +81,23 @@ export const installmentController = {
     try {
       const { installmentId } = req.params;
       const installment = await prisma.installment.findFirst({
-        where: { id: installmentId },
+        where: { id: String(installmentId) },
         include: { plan: { select: { merchantId: true, customerName: true, installmentCount: true, installments: true } } },
       });
-      if (!installment || installment.plan.merchantId !== req.merchant!.id)
+      if (!installment || (installment as any).plan?.merchantId !== req.merchant!.id)
         return res.status(404).json({ success: false, error: "Taksit bulunamadı" });
       if (installment.status === "PAID")
         return res.status(400).json({ success: false, error: "Bu taksit zaten ödendi" });
 
       const updated = await prisma.installment.update({
-        where: { id: installmentId },
+        where: { id: String(installmentId) },
         data: { status: "PAID", paidDate: new Date() },
       });
 
-      const allPaid = installment.plan.installments.every(i => i.id === installmentId || i.status === "PAID");
+      const allPaid = (installment as any).plan?.installments.every(i => i.id === installmentId || i.status === "PAID");
       if (allPaid) {
         await prisma.notification.create({
-          data: { merchantId: req.merchant!.id, title: `✅ Taksit Planı Tamamlandı`, body: `${installment.plan.customerName} müşterisinin tüm ${installment.plan.installmentCount} taksiti ödendi.`, type: "SUCCESS" },
+          data: { merchantId: req.merchant!.id, title: `✅ Taksit Planı Tamamlandı`, body: `${(installment as any).plan?.customerName} müşterisinin tüm ${(installment as any).plan?.installmentCount} taksiti ödendi.`, type: "SUCCESS" },
         });
       }
 

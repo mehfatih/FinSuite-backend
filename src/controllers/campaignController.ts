@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { pid, qs } from "../utils/params";
 import { PrismaClient, CampaignStatus } from '@prisma/client';
 import { Resend } from 'resend';
 
@@ -58,7 +59,7 @@ export const sendCampaign = async (req: Request, res: Response) => {
 
   try {
     const campaign = await prisma.campaign.findFirst({
-      where: { id, merchantId: merchant.id },
+      where: { id: String(id), merchantId: merchant.id },
     });
     if (!campaign) return res.status(404).json({ error: 'Kampanya bulunamadı' });
     if (campaign.status === CampaignStatus.COMPLETED) {
@@ -105,7 +106,7 @@ export const sendCampaign = async (req: Request, res: Response) => {
       }
 
       await prisma.campaign.update({
-        where: { id },
+        where: { id: String(id) },
         data: { status: CampaignStatus.COMPLETED, sentAt: new Date(), sentCount: emailsSent.length },
       });
 
@@ -114,7 +115,7 @@ export const sendCampaign = async (req: Request, res: Response) => {
 
     // EMAIL olmayan türler
     await prisma.campaign.update({
-      where: { id },
+      where: { id: String(id) },
       data: { status: CampaignStatus.COMPLETED, sentAt: new Date(), sentCount: customers.length },
     });
 
@@ -132,11 +133,11 @@ export const updateCampaign = async (req: Request, res: Response) => {
   const { name, subject, body, discountPercent, startDate, endDate } = req.body;
 
   try {
-    const campaign = await prisma.campaign.findFirst({ where: { id, merchantId: merchant.id } });
+    const campaign = await prisma.campaign.findFirst({ where: { id: String(id), merchantId: merchant.id } });
     if (!campaign) return res.status(404).json({ error: 'Bulunamadı' });
 
     const updated = await prisma.campaign.update({
-      where: { id },
+      where: { id: String(id) },
       data: {
         ...(name && { name }),
         ...(subject !== undefined && { subject }),
@@ -158,10 +159,10 @@ export const deleteCampaign = async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
-    const campaign = await prisma.campaign.findFirst({ where: { id, merchantId: merchant.id } });
+    const campaign = await prisma.campaign.findFirst({ where: { id: String(id), merchantId: merchant.id } });
     if (!campaign) return res.status(404).json({ error: 'Bulunamadı' });
 
-    await prisma.campaign.delete({ where: { id } });
+    await prisma.campaign.delete({ where: { id: String(id) } });
     res.json({ message: 'Kampanya silindi' });
   } catch {
     res.status(500).json({ error: 'Silme başarısız' });

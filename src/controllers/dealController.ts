@@ -1,4 +1,5 @@
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -41,7 +42,7 @@ export const dealController = {
   getById: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const deal = await prisma.deal.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
         include: { customer: true }
       });
       if (!deal) { res.status(404).json({ success: false, error: "Deal not found" }); return; }
@@ -77,7 +78,7 @@ export const dealController = {
   update: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const existing = await prisma.deal.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id }
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id }
       });
       if (!existing) { res.status(404).json({ success: false, error: "Deal not found" }); return; }
 
@@ -87,7 +88,7 @@ export const dealController = {
       if (req.body.expectedClose) updateData.expectedClose = new Date(req.body.expectedClose);
 
       const deal = await prisma.deal.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: updateData,
         include: { customer: { select: { id: true, name: true, company: true } } }
       });
@@ -100,11 +101,11 @@ export const dealController = {
   delete: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const existing = await prisma.deal.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id }
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id }
       });
       if (!existing) { res.status(404).json({ success: false, error: "Deal not found" }); return; }
 
-      await prisma.deal.delete({ where: { id: req.params.id } });
+      await prisma.deal.delete({ where: { id: pid(req.params.id) } });
       res.status(200).json({ success: true, message: "Deal deleted" });
     } catch (err) {
       res.status(500).json({ success: false, error: "Failed to delete deal" });

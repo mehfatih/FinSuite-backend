@@ -1,4 +1,5 @@
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -23,7 +24,7 @@ export const notificationController = {
   markRead: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
       await prisma.notification.update({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
         data: { isRead: true },
       });
       res.json({ success: true });

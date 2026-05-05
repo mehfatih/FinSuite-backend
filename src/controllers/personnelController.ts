@@ -3,6 +3,7 @@
 // Türkiye 2026 SGK + Gelir Vergisi hesaplama
 // ================================================================
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -78,7 +79,7 @@ export const personnelController = {
   getById: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
       const person = await prisma.personnel.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
         include: { salarySlips: { orderBy: { period: "desc" }, take: 12 } },
       });
       if (!person) return res.status(404).json({ success: false, error: "Personel bulunamadı" });
@@ -99,11 +100,11 @@ export const personnelController = {
 
   update: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const existing = await prisma.personnel.findFirst({ where: { id: req.params.id, merchantId: req.merchant!.id } });
+      const existing = await prisma.personnel.findFirst({ where: { id: pid(req.params.id), merchantId: req.merchant!.id } });
       if (!existing) return res.status(404).json({ success: false, error: "Personel bulunamadı" });
       const { name, tcKimlik, email, phone, position, department, startDate, grossSalary, sgkNo, ibanNo, notes, status, endDate } = req.body;
       const updated = await prisma.personnel.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { ...(name && { name }), ...(tcKimlik !== undefined && { tcKimlik }), ...(email !== undefined && { email }), ...(phone !== undefined && { phone }), ...(position !== undefined && { position }), ...(department !== undefined && { department }), ...(startDate && { startDate: new Date(startDate) }), ...(grossSalary !== undefined && { grossSalary }), ...(sgkNo !== undefined && { sgkNo }), ...(ibanNo !== undefined && { ibanNo }), ...(notes !== undefined && { notes }), ...(status && { status }), ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }) },
       });
       res.json({ success: true, data: updated });
@@ -114,7 +115,7 @@ export const personnelController = {
   generateSlip: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { period } = req.body; // "2026-04"
-      const person = await prisma.personnel.findFirst({ where: { id: req.params.id, merchantId: req.merchant!.id } });
+      const person = await prisma.personnel.findFirst({ where: { id: pid(req.params.id), merchantId: req.merchant!.id } });
       if (!person) return res.status(404).json({ success: false, error: "Personel bulunamadı" });
       if (person.status !== "ACTIVE") return res.status(400).json({ success: false, error: "Aktif olmayan personel için bordro oluşturulamaz" });
 

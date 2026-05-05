@@ -4,6 +4,7 @@
 // ================================================================
 
 import { Response, RequestHandler } from "express";
+import { pid, qs } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -117,7 +118,7 @@ export const customerScoreController = {
       const { customerId } = req.params;
 
       const customer = await prisma.customer.findFirst({
-        where: { id: customerId, merchantId },
+        where: { id: String(customerId), merchantId: String(merchantId) },
         include: {
           deals: true,
           tasks: true,
@@ -165,7 +166,7 @@ export const customerScoreController = {
       const avgDaysToPay = paidCount > 0 ? Math.round(totalDaysSum / paidCount) : 0;
 
       // Son aktivite
-      const lastDeal = customer.deals.sort((a, b) =>
+      const lastDeal = (customer as any).deals.sort((a, b) =>
         new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       )[0];
       const daysSinceLastActivity = lastDeal
@@ -173,10 +174,10 @@ export const customerScoreController = {
         : Math.floor((Date.now() - new Date(customer.createdAt).getTime()) / (1000 * 60 * 60 * 24));
 
       // Görev tamamlama oranı
-      const doneTasks = customer.tasks.filter(t => t.status === "DONE").length;
-      const taskCompletionRate = customer.tasks.length > 0 ? doneTasks / customer.tasks.length : 0;
+      const doneTasks = (customer as any).tasks.filter(t => t.status === "DONE").length;
+      const taskCompletionRate = (customer as any).tasks.length > 0 ? doneTasks / (customer as any).tasks.length : 0;
 
-      const wonDeals = customer.deals.filter(d => d.stage === "WON").length;
+      const wonDeals = (customer as any).deals.filter(d => d.stage === "WON").length;
 
       const scoreInput: CustomerScoreInput = {
         totalInvoices,
@@ -185,7 +186,7 @@ export const customerScoreController = {
         unpaid,
         totalSpent: Number(customer.totalSpent),
         avgDaysToPay,
-        dealCount: customer.deals.length,
+        dealCount: (customer as any).deals.length,
         wonDeals,
         daysSinceLastActivity,
         taskCompletionRate,
@@ -195,7 +196,7 @@ export const customerScoreController = {
 
       // Skoru DB'ye kaydet
       const updatedCustomer = await prisma.customer.update({
-        where: { id: customerId },
+        where: { id: String(customerId) },
         data: {
           aiPaymentScore: score.paymentScore,
           aiRetentionScore: score.retentionScore,

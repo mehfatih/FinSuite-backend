@@ -2,6 +2,7 @@
 // Zyrix FinSuite — Çek & Senet Takibi Controller (Feature 8)
 // ================================================================
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -60,14 +61,14 @@ export const checkController = {
   updateStatus: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { status, bounceReason } = req.body;
-      const check = await prisma.check.findFirst({ where: { id: req.params.id, merchantId: req.merchant!.id } });
+      const check = await prisma.check.findFirst({ where: { id: pid(req.params.id), merchantId: req.merchant!.id } });
       if (!check) return res.status(404).json({ success: false, error: "Çek bulunamadı" });
 
       const data: any = { status };
       if (status === "CLEARED") data.clearedDate = new Date();
       if (status === "BOUNCED") { data.bouncedDate = new Date(); data.bounceReason = bounceReason; }
 
-      const updated = await prisma.check.update({ where: { id: req.params.id }, data });
+      const updated = await prisma.check.update({ where: { id: pid(req.params.id) }, data });
 
       if (status === "BOUNCED") {
         await prisma.notification.create({

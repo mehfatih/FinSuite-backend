@@ -4,6 +4,7 @@
 // ================================================================
 
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -208,7 +209,7 @@ export const factoringController = {
   getById: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const request = await prisma.factoringRequest.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
         include: {
           invoice: {
             select: {
@@ -232,7 +233,7 @@ export const factoringController = {
   cancel: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const request = await prisma.factoringRequest.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
       });
       if (!request) {
         res.status(404).json({ success: false, error: "Talep bulunamadı" });
@@ -243,7 +244,7 @@ export const factoringController = {
         return;
       }
       const updated = await prisma.factoringRequest.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { status: "REJECTED", rejectionReason: "Kullanıcı tarafından iptal edildi" },
       });
       res.status(200).json({ success: true, data: updated, message: "Talep iptal edildi" });

@@ -1,4 +1,5 @@
 import { Request, Response, RequestHandler } from "express";
+import { pid } from "../../utils/params";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../config/database";
 import { AdminRequest } from "../../types";
@@ -53,7 +54,7 @@ export const adminMerchantsController = {
   getById: h(async (req: Request, res: Response): Promise<void> => {
     try {
       const merchant = await prisma.merchant.findUnique({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         include: {
           subscriptions: { orderBy: { createdAt: "desc" }, take: 3 },
           featureFlags: true,
@@ -124,12 +125,12 @@ export const adminMerchantsController = {
     try {
       const { status } = req.body;
       const merchant = await prisma.merchant.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { status },
         select: { id: true, name: true, email: true, status: true }
       });
       await prisma.auditLog.create({
-        data: { adminId: req.admin!.id, action: "UPDATE_MERCHANT_STATUS", targetType: "merchant", targetId: req.params.id, details: { status, merchantName: merchant.name }, ipAddress: req.ip }
+        data: { adminId: req.admin!.id, action: "UPDATE_MERCHANT_STATUS", targetType: "merchant", targetId: pid(req.params.id), details: { status, merchantName: merchant.name }, ipAddress: req.ip }
       });
       res.status(200).json({ success: true, data: merchant });
     } catch (err) {
@@ -141,12 +142,12 @@ export const adminMerchantsController = {
     try {
       const { plan } = req.body;
       const merchant = await prisma.merchant.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { plan },
         select: { id: true, name: true, email: true, plan: true }
       });
       await prisma.auditLog.create({
-        data: { adminId: req.admin!.id, action: "UPDATE_MERCHANT_PLAN", targetType: "merchant", targetId: req.params.id, details: { plan, merchantName: merchant.name }, ipAddress: req.ip }
+        data: { adminId: req.admin!.id, action: "UPDATE_MERCHANT_PLAN", targetType: "merchant", targetId: pid(req.params.id), details: { plan, merchantName: merchant.name }, ipAddress: req.ip }
       });
       res.status(200).json({ success: true, data: merchant });
     } catch (err) {
@@ -159,7 +160,7 @@ export const adminMerchantsController = {
     try {
       const { name, businessName, phone, country, adminNotes, trialEndsAt } = req.body;
       const merchant = await prisma.merchant.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: {
           ...(name         !== undefined && { name }),
           ...(businessName !== undefined && { businessName }),
@@ -171,7 +172,7 @@ export const adminMerchantsController = {
         select: { id: true, name: true, email: true, businessName: true, phone: true, country: true, adminNotes: true, trialEndsAt: true }
       });
       await prisma.auditLog.create({
-        data: { adminId: req.admin!.id, action: "UPDATE_MERCHANT", targetType: "merchant", targetId: req.params.id, details: req.body, ipAddress: req.ip }
+        data: { adminId: req.admin!.id, action: "UPDATE_MERCHANT", targetType: "merchant", targetId: pid(req.params.id), details: req.body, ipAddress: req.ip }
       });
       res.status(200).json({ success: true, data: merchant });
     } catch (err) {
@@ -185,7 +186,7 @@ export const adminMerchantsController = {
       const { days } = req.body;
       if (!days || days < 1) { res.status(400).json({ success: false, error: "Invalid days" }); return; }
 
-      const current = await prisma.merchant.findUnique({ where: { id: req.params.id }, select: { trialEndsAt: true, name: true } });
+      const current = await prisma.merchant.findUnique({ where: { id: pid(req.params.id) }, select: { trialEndsAt: true, name: true } });
       if (!current) { res.status(404).json({ success: false, error: "Not found" }); return; }
 
       const base = current.trialEndsAt && current.trialEndsAt > new Date() ? current.trialEndsAt : new Date();
@@ -193,7 +194,7 @@ export const adminMerchantsController = {
       newTrialEnd.setDate(newTrialEnd.getDate() + parseInt(days));
 
       const merchant = await prisma.merchant.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { trialEndsAt: newTrialEnd, status: "TRIAL" },
         select: { id: true, name: true, trialEndsAt: true, status: true }
       });
@@ -201,7 +202,7 @@ export const adminMerchantsController = {
       // Send notification to merchant
       await prisma.notification.create({
         data: {
-          merchantId: req.params.id,
+          merchantId: pid(req.params.id),
           title: "Deneme Süresi Uzatıldı! 🎁",
           body: `Hesabınıza ${days} günlük ek deneme süresi eklenmiştir. Yeni bitiş tarihi: ${newTrialEnd.toLocaleDateString("tr-TR")}`,
           type: "SUCCESS",
@@ -209,7 +210,7 @@ export const adminMerchantsController = {
       });
 
       await prisma.auditLog.create({
-        data: { adminId: req.admin!.id, action: "EXTEND_TRIAL", targetType: "merchant", targetId: req.params.id, details: { days, newTrialEnd, merchantName: current.name }, ipAddress: req.ip }
+        data: { adminId: req.admin!.id, action: "EXTEND_TRIAL", targetType: "merchant", targetId: pid(req.params.id), details: { days, newTrialEnd, merchantName: current.name }, ipAddress: req.ip }
       });
       res.status(200).json({ success: true, data: merchant });
     } catch (err) {
@@ -224,11 +225,11 @@ export const adminMerchantsController = {
       if (!title || !body) { res.status(400).json({ success: false, error: "Title and body required" }); return; }
 
       await prisma.notification.create({
-        data: { merchantId: req.params.id, title, body, type }
+        data: { merchantId: pid(req.params.id), title, body, type }
       });
 
       await prisma.auditLog.create({
-        data: { adminId: req.admin!.id, action: "SEND_NOTIFICATION", targetType: "merchant", targetId: req.params.id, details: { title, body, type }, ipAddress: req.ip }
+        data: { adminId: req.admin!.id, action: "SEND_NOTIFICATION", targetType: "merchant", targetId: pid(req.params.id), details: { title, body, type }, ipAddress: req.ip }
       });
       res.status(201).json({ success: true, message: "Notification sent" });
     } catch (err) {
@@ -240,12 +241,12 @@ export const adminMerchantsController = {
   archive: h(async (req: AdminRequest, res: Response): Promise<void> => {
     try {
       const merchant = await prisma.merchant.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { archivedAt: new Date(), status: "SUSPENDED" },
         select: { id: true, name: true, archivedAt: true }
       });
       await prisma.auditLog.create({
-        data: { adminId: req.admin!.id, action: "ARCHIVE_MERCHANT", targetType: "merchant", targetId: req.params.id, details: { merchantName: merchant.name }, ipAddress: req.ip }
+        data: { adminId: req.admin!.id, action: "ARCHIVE_MERCHANT", targetType: "merchant", targetId: pid(req.params.id), details: { merchantName: merchant.name }, ipAddress: req.ip }
       });
       res.status(200).json({ success: true, data: merchant, message: "Merchant archived. Data preserved." });
     } catch (err) {
@@ -257,12 +258,12 @@ export const adminMerchantsController = {
   unarchive: h(async (req: AdminRequest, res: Response): Promise<void> => {
     try {
       const merchant = await prisma.merchant.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { archivedAt: null, status: "ACTIVE" },
         select: { id: true, name: true, status: true }
       });
       await prisma.auditLog.create({
-        data: { adminId: req.admin!.id, action: "UNARCHIVE_MERCHANT", targetType: "merchant", targetId: req.params.id, details: { merchantName: merchant.name }, ipAddress: req.ip }
+        data: { adminId: req.admin!.id, action: "UNARCHIVE_MERCHANT", targetType: "merchant", targetId: pid(req.params.id), details: { merchantName: merchant.name }, ipAddress: req.ip }
       });
       res.status(200).json({ success: true, data: merchant });
     } catch (err) {
@@ -280,16 +281,16 @@ export const adminMerchantsController = {
       }
 
       const merchant = await prisma.merchant.findUnique({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         select: { name: true, email: true }
       });
       if (!merchant) { res.status(404).json({ success: false, error: "Merchant not found" }); return; }
 
       // Cascade delete via Prisma (all related data)
-      await prisma.merchant.delete({ where: { id: req.params.id } });
+      await prisma.merchant.delete({ where: { id: pid(req.params.id) } });
 
       await prisma.auditLog.create({
-        data: { adminId: req.admin!.id, action: "DELETE_MERCHANT", targetType: "merchant", targetId: req.params.id, details: { merchantName: merchant.name, email: merchant.email }, ipAddress: req.ip }
+        data: { adminId: req.admin!.id, action: "DELETE_MERCHANT", targetType: "merchant", targetId: pid(req.params.id), details: { merchantName: merchant.name, email: merchant.email }, ipAddress: req.ip }
       });
       res.status(200).json({ success: true, message: `Merchant "${merchant.name}" permanently deleted` });
     } catch (err) {
@@ -306,15 +307,15 @@ export const adminMerchantsController = {
       }
       const passwordHash = await bcrypt.hash(newPassword, 12);
       const merchant = await prisma.merchant.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { passwordHash },
         select: { id: true, name: true, email: true }
       });
       await prisma.notification.create({
-        data: { merchantId: req.params.id, title: "Şifreniz Sıfırlandı 🔒", body: "Hesabınızın şifresi yönetici tarafından sıfırlandı. Yeni şifrenizle giriş yapabilirsiniz.", type: "WARNING" }
+        data: { merchantId: pid(req.params.id), title: "Şifreniz Sıfırlandı 🔒", body: "Hesabınızın şifresi yönetici tarafından sıfırlandı. Yeni şifrenizle giriş yapabilirsiniz.", type: "WARNING" }
       });
       await prisma.auditLog.create({
-        data: { adminId: req.admin!.id, action: "RESET_MERCHANT_PASSWORD", targetType: "merchant", targetId: req.params.id, details: { merchantName: merchant.name }, ipAddress: req.ip }
+        data: { adminId: req.admin!.id, action: "RESET_MERCHANT_PASSWORD", targetType: "merchant", targetId: pid(req.params.id), details: { merchantName: merchant.name }, ipAddress: req.ip }
       });
       res.status(200).json({ success: true, message: "Password reset successfully" });
     } catch (err) {
@@ -326,7 +327,7 @@ export const adminMerchantsController = {
   getAuditLog: h(async (req: Request, res: Response): Promise<void> => {
     try {
       const logs = await prisma.auditLog.findMany({
-        where: { targetId: req.params.id },
+        where: { targetId: pid(req.params.id) },
         orderBy: { createdAt: "desc" },
         take: 50,
         include: { admin: { select: { name: true, email: true } } }

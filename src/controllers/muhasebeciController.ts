@@ -4,6 +4,7 @@
 // ================================================================
 
 import { Response, RequestHandler } from "express";
+import { pid, qs } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 import { Request } from "express";
@@ -102,7 +103,7 @@ export const muhasebeciController = {
   update: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const existing = await prisma.muhasebeciLink.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
       });
       if (!existing) {
         res.status(404).json({ success: false, error: "Muhasebeci linki bulunamadı" });
@@ -112,7 +113,7 @@ export const muhasebeciController = {
       const { accessLevel, isActive, expiresAt, permissions, notes } = req.body;
 
       const updated = await prisma.muhasebeciLink.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: {
           ...(accessLevel !== undefined && { accessLevel }),
           ...(isActive !== undefined && { isActive }),
@@ -131,14 +132,14 @@ export const muhasebeciController = {
   revoke: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const existing = await prisma.muhasebeciLink.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
       });
       if (!existing) {
         res.status(404).json({ success: false, error: "Muhasebeci linki bulunamadı" });
         return;
       }
       await prisma.muhasebeciLink.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { isActive: false },
       });
       res.status(200).json({ success: true, message: "Muhasebeci erişimi iptal edildi" });
@@ -154,7 +155,7 @@ export const muhasebeciController = {
       const { token } = req.params;
 
       const link = await prisma.muhasebeciLink.findUnique({
-        where: { accessToken: token },
+        where: { accessToken: String(token) },
         include: {
           merchant: {
             select: { id: true, name: true, businessName: true, currency: true },
@@ -175,12 +176,12 @@ export const muhasebeciController = {
 
       // Son erişim tarihini güncelle
       await prisma.muhasebeciLink.update({
-        where: { accessToken: token },
+        where: { accessToken: String(token) },
         data: { lastAccessAt: new Date() },
       });
 
       const perms = link.permissions as any;
-      const merchantId = link.merchant.id;
+      const merchantId = (link as any).merchant?.id;
 
       // İzinlere göre veri getir
       const [invoices, expenses] = await Promise.all([
@@ -209,7 +210,7 @@ export const muhasebeciController = {
       res.status(200).json({
         success: true,
         data: {
-          merchant: link.merchant,
+          merchant: (link as any).merchant,
           accessLevel: link.accessLevel,
           permissions: link.permissions,
           invoices,
@@ -229,7 +230,7 @@ export const muhasebeciController = {
       const { format = "csv", type = "invoices" } = req.query;
 
       const link = await prisma.muhasebeciLink.findUnique({
-        where: { accessToken: token },
+        where: { accessToken: String(token) },
       });
 
       if (!link || !link.isActive) {

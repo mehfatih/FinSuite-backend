@@ -1,4 +1,5 @@
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
@@ -127,7 +128,7 @@ Be concise, professional, and data-driven.`;
   getConversation: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const conversation = await prisma.aiConversation.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id }
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id }
       });
       if (!conversation) { res.status(404).json({ success: false, error: "Conversation not found" }); return; }
       res.status(200).json({ success: true, data: conversation });

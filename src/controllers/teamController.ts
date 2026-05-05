@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { pid, qs } from "../utils/params";
 import { PrismaClient } from '@prisma/client';
 import { Resend } from 'resend';
 import crypto from 'crypto';
@@ -110,7 +111,7 @@ export const acceptInvite = async (req: Request, res: Response) => {
 
   try {
     const member = await prisma.teamMember.findFirst({
-      where: { inviteToken: token, status: 'PENDING', inviteExpiry: { gt: new Date() } },
+      where: { inviteToken: String(token), status: 'PENDING', inviteExpiry: { gt: new Date() } },
     });
     if (!member) return res.status(400).json({ error: 'Geçersiz veya süresi dolmuş davet' });
 
@@ -134,12 +135,12 @@ export const updateTeamMember = async (req: Request, res: Response) => {
 
   try {
     const member = await prisma.teamMember.findFirst({
-      where: { id, merchantId: merchant.id },
+      where: { id: String(id), merchantId: merchant.id },
     });
     if (!member) return res.status(404).json({ error: 'Üye bulunamadı' });
 
     const updated = await prisma.teamMember.update({
-      where: { id },
+      where: { id: String(id) },
       data: {
         ...(role && { role }),
         ...(name && { name }),
@@ -159,11 +160,11 @@ export const removeTeamMember = async (req: Request, res: Response) => {
 
   try {
     const member = await prisma.teamMember.findFirst({
-      where: { id, merchantId: merchant.id },
+      where: { id: String(id), merchantId: merchant.id },
     });
     if (!member) return res.status(404).json({ error: 'Üye bulunamadı' });
 
-    await prisma.teamMember.delete({ where: { id } });
+    await prisma.teamMember.delete({ where: { id: String(id) } });
     res.json({ message: 'Üye kaldırıldı' });
   } catch (err) {
     res.status(500).json({ error: 'Silme başarısız' });

@@ -123,8 +123,7 @@ export const authController = {
       const token = jwt.sign(
         { id: merchant.id, email: merchant.email, plan: merchant.plan },
         env.jwtSecret,
-        { expiresIn: env.jwtExpiresIn }
-      );
+        { expiresIn: env.jwtExpiresIn } as any);
 
       res.status(201).json({ success: true, data: { merchant, token } });
     } catch (err) {
@@ -171,8 +170,7 @@ export const authController = {
       const token = jwt.sign(
         { id: updated.id, email: updated.email, plan: updated.plan, language: updated.language, currency: updated.currency },
         env.jwtSecret,
-        { expiresIn: env.jwtExpiresIn }
-      );
+        { expiresIn: env.jwtExpiresIn } as any);
 
       // Warning for trial expiring in 3 days
       let warning: string | null = null;

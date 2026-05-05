@@ -4,6 +4,7 @@
 // ================================================================
 
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -97,7 +98,7 @@ async function sendToGIB(xmlContent: string, faturaNo: string): Promise<{
     const result = await response.json();
     return {
       success: true,
-      gibUUID: result.uuid || result.UUID,
+      gibUUID: (result as any).uuid || (result as any).UUID,
       gibResponse: result,
     };
   } catch (err: any) {
@@ -225,7 +226,7 @@ export const eFaturaController = {
   getById: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const eFatura = await prisma.eFatura.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
         include: { invoice: true },
       });
       if (!eFatura) {
@@ -242,7 +243,7 @@ export const eFaturaController = {
   cancel: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const eFatura = await prisma.eFatura.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
       });
       if (!eFatura) {
         res.status(404).json({ success: false, error: "E-Fatura bulunamadı" });
@@ -254,7 +255,7 @@ export const eFaturaController = {
       }
 
       const updated = await prisma.eFatura.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { gibStatus: "CANCELLED" },
       });
       res.status(200).json({ success: true, data: updated, message: "E-Fatura iptal edildi" });
@@ -267,7 +268,7 @@ export const eFaturaController = {
   downloadXML: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const eFatura = await prisma.eFatura.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
       });
       if (!eFatura || !eFatura.xmlContent) {
         res.status(404).json({ success: false, error: "XML bulunamadı" });

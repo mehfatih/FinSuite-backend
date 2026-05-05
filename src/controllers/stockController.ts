@@ -3,6 +3,7 @@
 // CRUD + hareket takibi + düşük stok uyarısı
 // ================================================================
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -36,7 +37,7 @@ export const stockController = {
   getById: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
       const item = await prisma.stockItem.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id },
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id },
         include: { movements: { orderBy: { createdAt: "desc" }, take: 20 } },
       });
       if (!item) return res.status(404).json({ success: false, error: "Ürün bulunamadı" });
@@ -67,11 +68,11 @@ export const stockController = {
 
   update: h(async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const existing = await prisma.stockItem.findFirst({ where: { id: req.params.id, merchantId: req.merchant!.id } });
+      const existing = await prisma.stockItem.findFirst({ where: { id: pid(req.params.id), merchantId: req.merchant!.id } });
       if (!existing) return res.status(404).json({ success: false, error: "Ürün bulunamadı" });
       const { name, sku, barcode, category, unit, quantity, minQuantity, costPrice, salePrice, vatRate, location, description, isActive } = req.body;
       const item = await prisma.stockItem.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: { ...(name && { name }), ...(sku !== undefined && { sku }), ...(barcode !== undefined && { barcode }), ...(category !== undefined && { category }), ...(unit && { unit }), ...(quantity !== undefined && { quantity }), ...(minQuantity !== undefined && { minQuantity }), ...(costPrice !== undefined && { costPrice }), ...(salePrice !== undefined && { salePrice }), ...(vatRate !== undefined && { vatRate }), ...(location !== undefined && { location }), ...(description !== undefined && { description }), ...(isActive !== undefined && { isActive }) },
       });
       res.json({ success: true, data: item });
@@ -83,7 +84,7 @@ export const stockController = {
       const { type, quantity, unitPrice, reference, notes } = req.body;
       if (!type || !quantity) return res.status(400).json({ success: false, error: "Tip ve miktar zorunlu" });
 
-      const item = await prisma.stockItem.findFirst({ where: { id: req.params.id, merchantId: req.merchant!.id } });
+      const item = await prisma.stockItem.findFirst({ where: { id: pid(req.params.id), merchantId: req.merchant!.id } });
       if (!item) return res.status(404).json({ success: false, error: "Ürün bulunamadı" });
 
       const qtyChange = ["IN", "RETURN"].includes(type) ? quantity : -Math.abs(quantity);

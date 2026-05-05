@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { pid, qs } from "../utils/params";
 import puppeteer from 'puppeteer';
 import { PrismaClient } from '@prisma/client';
 
@@ -10,10 +11,9 @@ export const downloadInvoicePdf = async (req: Request, res: Response) => {
 
   try {
     const invoice = await prisma.invoice.findFirst({
-      where: { id, merchantId: merchant.id },
+      where: { id: String(id), merchantId: merchant.id },
       include: {
         merchant: true,
-        items: true,
       },
     });
 

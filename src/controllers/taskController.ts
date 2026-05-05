@@ -1,4 +1,5 @@
 import { Response, RequestHandler } from "express";
+import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 
@@ -56,7 +57,7 @@ export const taskController = {
   update: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const existing = await prisma.task.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id }
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id }
       });
       if (!existing) { res.status(404).json({ success: false, error: "Task not found" }); return; }
 
@@ -65,7 +66,7 @@ export const taskController = {
       if (req.body.dueDate) updateData.dueDate = new Date(req.body.dueDate);
 
       const task = await prisma.task.update({
-        where: { id: req.params.id },
+        where: { id: pid(req.params.id) },
         data: updateData,
         include: { customer: { select: { id: true, name: true } } }
       });
@@ -78,11 +79,11 @@ export const taskController = {
   delete: h(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const existing = await prisma.task.findFirst({
-        where: { id: req.params.id, merchantId: req.merchant!.id }
+        where: { id: pid(req.params.id), merchantId: req.merchant!.id }
       });
       if (!existing) { res.status(404).json({ success: false, error: "Task not found" }); return; }
 
-      await prisma.task.delete({ where: { id: req.params.id } });
+      await prisma.task.delete({ where: { id: pid(req.params.id) } });
       res.status(200).json({ success: true, message: "Task deleted" });
     } catch (err) {
       res.status(500).json({ success: false, error: "Failed to delete task" });

@@ -3,6 +3,7 @@
 // Public profile: finsuite.zyrix.co/p/:slug
 // ================================================================
 import { Response, RequestHandler } from "express";
+import { pid, qs } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
 import { Request } from "express";
@@ -66,10 +67,10 @@ export const publicProfileController = {
   viewPublic: h(async (req: Request, res: Response) => {
     try {
       const { slug } = req.params;
-      const profile = await prisma.publicProfile.findUnique({ where: { slug } });
+      const profile = await prisma.publicProfile.findUnique({ where: { slug: String(slug) } });
       if (!profile || !profile.isActive) return res.status(404).json({ success: false, error: "Profil bulunamadı" });
       // View count artır
-      await prisma.publicProfile.update({ where: { slug }, data: { viewCount: { increment: 1 } } });
+      await prisma.publicProfile.update({ where: { slug: String(slug) }, data: { viewCount: { increment: 1 } } });
       res.json({ success: true, data: profile });
     } catch { res.status(500).json({ success: false, error: "Profil alınamadı" }); }
   }),

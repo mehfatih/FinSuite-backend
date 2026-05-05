@@ -80,10 +80,10 @@ export const benchmarkController = {
         || await prisma.benchmarkAverage.findFirst({ where: { period } });
 
       const comparison = avg ? {
-        revenue:        { yours: Number(snapshot.monthlyRevenue), average: Number(avg.avgRevenue),         diff: Number(snapshot.monthlyRevenue) - Number(avg.avgRevenue),         diffPct: avg.avgRevenue > 0 ? ((Number(snapshot.monthlyRevenue) - Number(avg.avgRevenue)) / Number(avg.avgRevenue)) * 100 : 0 },
-        invoiceValue:   { yours: Number(snapshot.avgInvoiceValue), average: Number(avg.avgInvoiceValue),   diff: Number(snapshot.avgInvoiceValue) - Number(avg.avgInvoiceValue),   diffPct: avg.avgInvoiceValue > 0 ? ((Number(snapshot.avgInvoiceValue) - Number(avg.avgInvoiceValue)) / Number(avg.avgInvoiceValue)) * 100 : 0 },
+        revenue:        { yours: Number(snapshot.monthlyRevenue), average: Number(avg.avgRevenue),         diff: Number(snapshot.monthlyRevenue) - Number(avg.avgRevenue),         diffPct: Number(avg.avgRevenue) > 0 ? ((Number(snapshot.monthlyRevenue) - Number(avg.avgRevenue)) / Number(avg.avgRevenue)) * 100 : 0 },
+        invoiceValue:   { yours: Number(snapshot.avgInvoiceValue), average: Number(avg.avgInvoiceValue),   diff: Number(snapshot.avgInvoiceValue) - Number(avg.avgInvoiceValue),   diffPct: Number(avg.avgInvoiceValue) > 0 ? ((Number(snapshot.avgInvoiceValue) - Number(avg.avgInvoiceValue)) / Number(avg.avgInvoiceValue)) * 100 : 0 },
         collectionRate: { yours: Number(snapshot.collectionRate),  average: Number(avg.avgCollectionRate), diff: Number(snapshot.collectionRate) - Number(avg.avgCollectionRate),  diffPct: 0 },
-        daysToPay:      { yours: snapshot.avgDaysToPay,            average: avg.avgDaysToPay,              diff: snapshot.avgDaysToPay - avg.avgDaysToPay,                          note: snapshot.avgDaysToPay > avg.avgDaysToPay ? "Ortalamadan daha uzun sürüyor" : "Ortalamanın altında — iyi!" },
+        daysToPay:      { yours: Number(snapshot.avgDaysToPay),            average: avg.avgDaysToPay,              diff: Number(snapshot.avgDaysToPay) - Number(avg.avgDaysToPay),                          note: Number(snapshot.avgDaysToPay) > Number(avg.avgDaysToPay) ? "Ortalamadan daha uzun sürüyor" : "Ortalamanın altında — iyi!" },
       } : null;
 
       // Insights üret
