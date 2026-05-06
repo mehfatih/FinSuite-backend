@@ -14,9 +14,12 @@ export const env = {
   iyzicoSecretKey:  process.env.IYZICO_SECRET_KEY || "",
   iyzicoBaseUrl:    process.env.IYZICO_BASE_URL || "https://sandbox.iyzipay.com",
   // WhatsApp (Meta Cloud API)
-  whatsappToken:    process.env.WHATSAPP_TOKEN || "",
-  whatsappPhoneId:  process.env.WHATSAPP_PHONE_ID || "",
-  whatsappBusinessId: process.env.WHATSAPP_BUSINESS_ID || "",
+  whatsappToken:        process.env.WHATSAPP_TOKEN || "",
+  whatsappPhoneId:      process.env.WHATSAPP_PHONE_ID || "",
+  whatsappBusinessId:   process.env.WHATSAPP_BUSINESS_ID || "",
+  whatsappVerifyToken:  process.env.WHATSAPP_VERIFY_TOKEN || "",
+  // Cron jobs (e.g. reminders/run-all - Sprint 2)
+  cronSecret:           process.env.CRON_SECRET || "",
   // Bank integrations (placeholder - real keys per bank go in DB per merchant)
   bankSandboxMode:  (process.env.BANK_SANDBOX_MODE || "true") === "true",
 };

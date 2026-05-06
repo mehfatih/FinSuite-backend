@@ -9,6 +9,7 @@
 // ============================================================
 
 import { Request, Response } from "express";
+import { env } from "../config/env";
 import { z } from "zod";
 import { prisma } from "../config/database";
 import { sendWhatsAppMessage } from "../services/whatsappService";
@@ -222,7 +223,7 @@ export async function webhookVerifyHandler(req: Request, res: Response) {
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
-  const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN;
+  const expectedToken = env.whatsappVerifyToken;
 
   if (mode === "subscribe" && token === expectedToken && challenge) {
     return res.status(200).send(String(challenge));
@@ -606,7 +607,7 @@ export async function runRemindersHandler(
 
 export async function runRemindersForAllHandler(req: Request, res: Response) {
   const provided = req.header("x-cron-secret");
-  const expected = process.env.CRON_SECRET;
+  const expected = env.cronSecret;
   if (!expected || provided !== expected) {
     return fail(res, 403, "Forbidden");
   }
