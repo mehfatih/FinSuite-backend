@@ -125,7 +125,8 @@ router.post("/login", async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error("[admin/auth/login] error:", err);
+    return res.status(500).json({ success: false, error: err?.message || "Internal error during login" });
   }
 });
 

@@ -80,6 +80,9 @@ app.use("/api/deals",         dealRoutes);
 app.use("/api/tasks",         taskRoutes);
 app.use("/api/ai",            aiRoutes);
 app.use("/api/public-ai-demo", publicAiDemoRoutes);
+// IMPORTANT: mount the more specific /api/admin/auth BEFORE the generic /api/admin
+// so the public login/2FA endpoints aren't intercepted by adminRoutes' authenticateAdmin middleware.
+app.use('/api/admin/auth',    adminAuthRoutes);
 app.use("/api/admin",         adminRoutes);
 app.use("/api/profile",       profileRoutes);
 app.use("/api/notifications", notificationRoutes);
@@ -121,8 +124,7 @@ app.use('/api/support',    supportRoutes);
 app.use('/api/migration',  migrationRoutes);
 app.use('/api/exports',    exportsRouter);
 app.use('/api/security',   securityRoutes);
-// Phase 14 — Admin Operations Center
-app.use('/api/admin/auth', adminAuthRoutes);
+// Phase 14 — Admin Operations Center (mounted earlier, before /api/admin)
 // Public
 app.get("/p/:slug", publicProfileController.viewPublic);
 

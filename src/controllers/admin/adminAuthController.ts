@@ -30,8 +30,9 @@ export const adminAuthController = {
         { expiresIn: "12h" }
       );
       res.status(200).json({ success: true, data: { token, admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } } });
-    } catch (err) {
-      res.status(500).json({ success: false, error: "Login failed" });
+    } catch (err: any) {
+      console.error("[admin/login controller] error:", err);
+      res.status(500).json({ success: false, error: err?.message || "Internal error during login" });
     }
   }),
 
