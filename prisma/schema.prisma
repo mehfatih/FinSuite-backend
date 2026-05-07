@@ -1526,3 +1526,214 @@ model BenchmarkAverage {
   @@unique([period, sector, province])
   @@map("benchmark_averages")
 }
+
+// =====================================================================
+// PHASE 13 — Trust, Migration & Support
+// =====================================================================
+
+// ───── Cluster A: Support ─────
+enum TicketStatus {
+  OPEN
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum MessageAuthorType {
+  CUSTOMER
+  STAFF
+  AI_BOT
+  SYSTEM
+}
+
+model SupportTicket {
+  id             String          @id @default(uuid())
+  merchantId     String
+  userId         String
+  subject        String
+  description    String
+  status         TicketStatus    @default(OPEN)
+  priority       TicketPriority  @default(NORMAL)
+  category       String?
+  assignedTo     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  resolvedAt     DateTime?
+  csatRating     Int?
+  csatComment    String?
+  messages       TicketMessage[]
+
+  @@index([merchantId, status])
+  @@index([userId])
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id          String            @id @default(uuid())
+  ticketId    String
+  authorType  MessageAuthorType
+  authorId    String
+  content     String
+  attachments Json?
+  internal    Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  ticket      SupportTicket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("ticket_messages")
+}
+
+model KnowledgeBaseArticle {
+  id              String   @id @default(uuid())
+  slug            String   @unique
+  titleTr         String
+  titleEn         String
+  titleAr         String
+  contentTr       String
+  contentEn       String
+  contentAr       String
+  category        String
+  tags            String[]
+  published       Boolean  @default(false)
+  viewCount       Int      @default(0)
+  helpfulCount    Int      @default(0)
+  notHelpfulCount Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([category, published])
+  @@index([slug])
+  @@map("kb_articles")
+}
+
+// ───── Cluster B: Migration ─────
+enum MigrationStatus {
+  PENDING
+  VALIDATING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  ROLLED_BACK
+}
+
+enum ExportStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+model MigrationJob {
+  id               String          @id @default(uuid())
+  merchantId       String
+  userId           String
+  sourceSystem     String
+  fileName         String
+  fileSize         Int
+  status           MigrationStatus @default(PENDING)
+  totalRows        Int             @default(0)
+  processedRows    Int             @default(0)
+  errorRows        Int             @default(0)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  rolledBackAt     DateTime?
+  fieldMapping     Json
+  validationErrors Json?
+  snapshotData     Json?
+  createdAt        DateTime        @default(now())
+
+  @@index([merchantId, status])
+  @@map("migration_jobs")
+}
+
+model ExportJob {
+  id          String       @id @default(uuid())
+  merchantId  String
+  userId      String
+  type        String
+  format      String
+  schedule    String?
+  status      ExportStatus @default(PENDING)
+  fileUrl     String?
+  expiresAt   DateTime?
+  createdAt   DateTime     @default(now())
+  completedAt DateTime?
+
+  @@index([merchantId, status])
+  @@map("export_jobs")
+}
+
+// ───── Cluster C: Security ─────
+model TwoFactorAuth {
+  id                  String    @id @default(uuid())
+  userId              String    @unique
+  method              String
+  secret              String?
+  phoneNumber         String?
+  webauthnCredentials Json?
+  backupCodes         Json?
+  enabled             Boolean   @default(false)
+  enabledAt           DateTime?
+  lastUsedAt          DateTime?
+
+  @@index([userId])
+  @@map("two_factor_auth")
+}
+
+model UserSession {
+  id           String    @id @default(uuid())
+  userId       String
+  deviceInfo   Json
+  ipAddress    String
+  location     String?
+  userAgent    String
+  createdAt    DateTime  @default(now())
+  lastActiveAt DateTime  @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+
+  @@index([userId, revokedAt])
+  @@map("user_sessions")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  merchantId   String
+  userId       String
+  action       String
+  resourceType String?
+  resourceId   String?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([merchantId, createdAt])
+  @@index([userId, action])
+  @@index([resourceType, resourceId])
+  @@map("audit_logs")
+}
+
+model DataExportRequest {
+  id          String    @id @default(uuid())
+  userId      String
+  merchantId  String
+  reason      String?
+  status      String    @default("pending")
+  requestedAt DateTime  @default(now())
+  completedAt DateTime?
+  fileUrl     String?
+  expiresAt   DateTime?
+
+  @@index([userId])
+  @@map("data_export_requests")
+}

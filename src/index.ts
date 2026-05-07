@@ -51,6 +51,11 @@ import otpRoutes from './routes/otpRoutes';
 import teamRoutes from './routes/teamRoutes';
 import campaignRoutes from './routes/campaignRoutes';
 import publicAiDemoRoutes from './routes/publicAiDemo';
+// Phase 13 — Trust, Migration & Support
+import supportRoutes from './routes/support';
+import migrationRoutes, { exportsRouter } from './routes/migration';
+import securityRoutes from './routes/security';
+import { auditLogger } from './middleware/auditLogger';
 
 const app = express();
 
@@ -108,6 +113,12 @@ app.use('/api/invoices',   invoicePdfRoutes);  // يضيف /:id/pdf على ال�
 app.use('/api/auth/otp',   otpRoutes);
 app.use('/api/team',       teamRoutes);
 app.use('/api/campaigns',  campaignRoutes);
+// Phase 13 — Trust, Migration & Support
+app.use(auditLogger);
+app.use('/api/support',    supportRoutes);
+app.use('/api/migration',  migrationRoutes);
+app.use('/api/exports',    exportsRouter);
+app.use('/api/security',   securityRoutes);
 // Public
 app.get("/p/:slug", publicProfileController.viewPublic);
 
