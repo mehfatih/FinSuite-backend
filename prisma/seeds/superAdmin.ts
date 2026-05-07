@@ -93,6 +93,7 @@ async function seed() {
       where: { email: a.email },
       update: {
         passwordHash,
+        name: a.fullName,
         fullName: a.fullName,
         role: AdminRole.SUPER_ADMIN,
         permissions: ALL_PERMISSIONS,
@@ -104,6 +105,7 @@ async function seed() {
       create: {
         email: a.email,
         passwordHash,
+        name: a.fullName,
         fullName: a.fullName,
         role: AdminRole.SUPER_ADMIN,
         permissions: ALL_PERMISSIONS,
