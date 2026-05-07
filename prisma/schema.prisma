@@ -1737,3 +1737,182 @@ model DataExportRequest {
   @@index([userId])
   @@map("data_export_requests")
 }
+
+// =====================================================================
+// PHASE 14 — Admin Operations Center
+// =====================================================================
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  FINANCE
+  SUPPORT
+  ANALYST
+  MARKETING
+  COMPLIANCE
+  READ_ONLY
+}
+
+enum AuditSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+model AdminUser {
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  passwordHash        String
+  fullName            String
+  role                AdminRole @default(SUPPORT)
+  permissions         Json
+  isActive            Boolean   @default(true)
+  isLocked            Boolean   @default(false)
+  twoFactorEnabled    Boolean   @default(false)
+  twoFactorSecret     String?
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  passwordChangedAt   DateTime  @default(now())
+  mustChangePassword  Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  createdBy           String?
+  notes               String?
+
+  auditLogs           AdminAuditLog[]
+  impersonations      ImpersonationSession[]
+
+  @@index([email])
+  @@index([role])
+  @@map("admin_users")
+}
+
+model AdminAuditLog {
+  id           String        @id @default(uuid())
+  adminUserId  String
+  action       String
+  resourceType String?
+  resourceId   String?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  beforeState  Json?
+  afterState   Json?
+  severity     AuditSeverity @default(INFO)
+  createdAt    DateTime      @default(now())
+
+  admin        AdminUser     @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId, createdAt])
+  @@index([action])
+  @@index([severity, createdAt])
+  @@map("admin_audit_logs")
+}
+
+model ImpersonationSession {
+  id              String    @id @default(uuid())
+  adminUserId     String
+  customerUserId  String
+  reason          String
+  consentGranted  Boolean   @default(false)
+  consentToken    String?
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  ipAddress       String?
+
+  admin           AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@index([customerUserId])
+  @@map("impersonation_sessions")
+}
+
+model CustomerArchive {
+  id                String   @id @default(uuid())
+  originalCompanyId String   @unique
+  originalUserId    String
+  archivedData      Json
+  reason            String
+  archivedBy        String
+  archivedAt        DateTime @default(now())
+  scheduledPurgeAt  DateTime
+  restoredAt        DateTime?
+  restoredBy        String?
+
+  @@index([originalCompanyId])
+  @@index([scheduledPurgeAt])
+  @@map("customer_archives")
+}
+
+model AdminNotification {
+  id          String   @id @default(uuid())
+  adminUserId String?
+  type        String
+  title       String
+  message     String
+  severity    String   @default("info")
+  link        String?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([adminUserId, isRead])
+  @@map("admin_notifications")
+}
+
+model FeatureFlag {
+  id              String   @id @default(uuid())
+  key             String   @unique
+  name            String
+  description     String?
+  isEnabled       Boolean  @default(false)
+  rolloutPercent  Int      @default(0)
+  targetUsers     Json?
+  targetCompanies Json?
+  conditions      Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  updatedBy       String?
+
+  @@index([key])
+  @@map("feature_flags")
+}
+
+model Coupon {
+  id                String    @id @default(uuid())
+  code              String    @unique
+  description       String?
+  discountType      String
+  discountValue     Decimal   @db.Decimal(18, 2)
+  currency          String    @default("TRY")
+  maxRedemptions    Int?
+  redemptionCount   Int       @default(0)
+  validFrom         DateTime  @default(now())
+  validUntil        DateTime?
+  isActive          Boolean   @default(true)
+  applicableTiers   Json?
+  newCustomersOnly  Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  createdBy         String
+
+  @@index([code])
+  @@index([isActive, validUntil])
+  @@map("coupons")
+}
+
+model SystemAlert {
+  id          String    @id @default(uuid())
+  type        String
+  severity    String
+  title       String
+  message     String
+  metadata    Json?
+  isResolved  Boolean   @default(false)
+  resolvedAt  DateTime?
+  resolvedBy  String?
+  createdAt   DateTime  @default(now())
+
+  @@index([severity, isResolved])
+  @@index([type, createdAt])
+  @@map("system_alerts")
+}
