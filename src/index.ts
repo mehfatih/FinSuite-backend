@@ -56,6 +56,8 @@ import supportRoutes from './routes/support';
 import migrationRoutes, { exportsRouter } from './routes/migration';
 import securityRoutes from './routes/security';
 import { auditLogger } from './middleware/auditLogger';
+// Phase 14 — Admin Operations Center
+import adminAuthRoutes from './routes/admin/auth';
 
 const app = express();
 
@@ -119,6 +121,8 @@ app.use('/api/support',    supportRoutes);
 app.use('/api/migration',  migrationRoutes);
 app.use('/api/exports',    exportsRouter);
 app.use('/api/security',   securityRoutes);
+// Phase 14 — Admin Operations Center
+app.use('/api/admin/auth', adminAuthRoutes);
 // Public
 app.get("/p/:slug", publicProfileController.viewPublic);
 
