@@ -23,6 +23,21 @@ interface AdminTokenPayload {
   isAdmin: true;
 }
 
+// RFC 4648 base32 — required by authenticator apps in otpauth:// URIs.
+function hexToBase32(hex: string): string {
+  const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const bytes = Buffer.from(hex, "hex");
+  let bits = "";
+  for (const b of bytes) bits += b.toString(2).padStart(8, "0");
+  // pad to multiple of 5
+  while (bits.length % 5 !== 0) bits += "0";
+  let out = "";
+  for (let i = 0; i < bits.length; i += 5) {
+    out += ALPHABET[parseInt(bits.slice(i, i + 5), 2)];
+  }
+  return out; // unpadded — authenticator apps accept this
+}
+
 function makeToken(admin: { id: string; email: string; role: string }) {
   const payload: AdminTokenPayload = {
     adminId: admin.id,
@@ -235,8 +250,10 @@ router.post("/2fa/setup", async (req: Request, res: Response) => {
     });
     const issuer = "Zyrix Admin";
     const label = encodeURIComponent(`${issuer}:${admin.email}`);
-    const provisioningUri = `otpauth://totp/${label}?secret=${Buffer.from(raw, "hex").toString("base64").replace(/=+$/, "")}&issuer=${issuer}`;
-    return res.json({ success: true, data: { provisioningUri } });
+    const secretBase32 = hexToBase32(raw);
+    const provisioningUri = `otpauth://totp/${label}?secret=${secretBase32}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+    // Also return the raw secret (base32) so the UI can show a manual-entry fallback.
+    return res.json({ success: true, data: { provisioningUri, secret: secretBase32 } });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
