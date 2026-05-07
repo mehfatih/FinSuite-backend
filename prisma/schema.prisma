@@ -75,6 +75,9 @@ enum AdminRole {
   SUPPORT
   FINANCE
   ANALYST
+  MARKETING
+  COMPLIANCE
+  READ_ONLY
 }
 
 enum NotificationType {
@@ -1187,45 +1190,78 @@ model OtpCode {
 }
 
 model AdminUser {
-  id           String     @id @default(uuid())
-  email        String     @unique
-  passwordHash String
-  name         String
-  role         AdminRole  @default(SUPPORT)
-  isActive     Boolean    @default(true)
-  lastLoginAt  DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  auditLogs    AuditLog[]
+  id                  String                 @id @default(uuid())
+  email               String                 @unique
+  passwordHash        String
+  name                String
+  fullName            String?
+  role                AdminRole              @default(SUPPORT)
+  permissions         Json                   @default("[]")
+  isActive            Boolean                @default(true)
+  isLocked            Boolean                @default(false)
+  twoFactorEnabled    Boolean                @default(false)
+  twoFactorSecret     String?
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+  failedLoginAttempts Int                    @default(0)
+  lockedUntil         DateTime?
+  passwordChangedAt   DateTime               @default(now())
+  mustChangePassword  Boolean                @default(true)
+  createdBy           String?
+  notes               String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  auditLogs           AuditLog[]
+  adminAuditLogs      AdminAuditLog[]
+  impersonations      ImpersonationSession[]
 
   @@map("admin_users")
 }
 
 model AuditLog {
-  id         String    @id @default(uuid())
-  adminId    String
-  action     String
-  targetType String
-  targetId   String?
-  details    Json?
-  ipAddress  String?
-  createdAt  DateTime  @default(now())
-  admin      AdminUser @relation(fields: [adminId], references: [id])
+  id           String     @id @default(uuid())
+  adminId      String?
+  merchantId   String?
+  userId       String?
+  action       String
+  targetType   String?
+  targetId     String?
+  resourceType String?
+  resourceId   String?
+  details      Json?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime   @default(now())
+  admin        AdminUser? @relation(fields: [adminId], references: [id])
 
+  @@index([adminId])
+  @@index([merchantId, createdAt])
+  @@index([userId, action])
+  @@index([resourceType, resourceId])
   @@map("audit_logs")
 }
 
 model FeatureFlag {
-  id           String   @id @default(uuid())
-  merchantId   String
-  feature      String
-  isEnabled    Boolean  @default(true)
-  overrideNote String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  merchant     Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  id              String    @id @default(uuid())
+  merchantId      String?
+  feature         String?
+  key             String?   @unique
+  name            String?
+  description     String?
+  isEnabled       Boolean   @default(true)
+  rolloutPercent  Int       @default(0)
+  overrideNote    String?
+  targetUsers     Json?
+  targetCompanies Json?
+  conditions      Json?
+  updatedBy       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  merchant        Merchant? @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@unique([merchantId, feature])
+  @@index([key])
   @@map("feature_flags")
 }
 
@@ -1555,21 +1591,21 @@ enum MessageAuthorType {
 }
 
 model SupportTicket {
-  id             String          @id @default(uuid())
-  merchantId     String
-  userId         String
-  subject        String
-  description    String
-  status         TicketStatus    @default(OPEN)
-  priority       TicketPriority  @default(NORMAL)
-  category       String?
-  assignedTo     String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  resolvedAt     DateTime?
-  csatRating     Int?
-  csatComment    String?
-  messages       TicketMessage[]
+  id          String          @id @default(uuid())
+  merchantId  String
+  userId      String
+  subject     String
+  description String
+  status      TicketStatus    @default(OPEN)
+  priority    TicketPriority  @default(NORMAL)
+  category    String?
+  assignedTo  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  resolvedAt  DateTime?
+  csatRating  Int?
+  csatComment String?
+  messages    TicketMessage[]
 
   @@index([merchantId, status])
   @@index([userId])
@@ -1705,24 +1741,6 @@ model UserSession {
   @@map("user_sessions")
 }
 
-model AuditLog {
-  id           String   @id @default(uuid())
-  merchantId   String
-  userId       String
-  action       String
-  resourceType String?
-  resourceId   String?
-  metadata     Json?
-  ipAddress    String?
-  userAgent    String?
-  createdAt    DateTime @default(now())
-
-  @@index([merchantId, createdAt])
-  @@index([userId, action])
-  @@index([resourceType, resourceId])
-  @@map("audit_logs")
-}
-
 model DataExportRequest {
   id          String    @id @default(uuid())
   userId      String
@@ -1742,50 +1760,10 @@ model DataExportRequest {
 // PHASE 14 — Admin Operations Center
 // =====================================================================
 
-enum AdminRole {
-  SUPER_ADMIN
-  ADMIN
-  FINANCE
-  SUPPORT
-  ANALYST
-  MARKETING
-  COMPLIANCE
-  READ_ONLY
-}
-
 enum AuditSeverity {
   INFO
   WARNING
   CRITICAL
-}
-
-model AdminUser {
-  id                  String    @id @default(uuid())
-  email               String    @unique
-  passwordHash        String
-  fullName            String
-  role                AdminRole @default(SUPPORT)
-  permissions         Json
-  isActive            Boolean   @default(true)
-  isLocked            Boolean   @default(false)
-  twoFactorEnabled    Boolean   @default(false)
-  twoFactorSecret     String?
-  lastLoginAt         DateTime?
-  lastLoginIp         String?
-  failedLoginAttempts Int       @default(0)
-  lockedUntil         DateTime?
-  passwordChangedAt   DateTime  @default(now())
-  mustChangePassword  Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  createdBy           String?
-  notes               String?
-
-  auditLogs           AdminAuditLog[]
-  impersonations      ImpersonationSession[]
-
-  @@index([email])
-  @@index([role])
-  @@map("admin_users")
 }
 
 model AdminAuditLog {
@@ -1802,7 +1780,7 @@ model AdminAuditLog {
   severity     AuditSeverity @default(INFO)
   createdAt    DateTime      @default(now())
 
-  admin        AdminUser     @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  admin AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
 
   @@index([adminUserId, createdAt])
   @@index([action])
@@ -1811,17 +1789,17 @@ model AdminAuditLog {
 }
 
 model ImpersonationSession {
-  id              String    @id @default(uuid())
-  adminUserId     String
-  customerUserId  String
-  reason          String
-  consentGranted  Boolean   @default(false)
-  consentToken    String?
-  startedAt       DateTime  @default(now())
-  endedAt         DateTime?
-  ipAddress       String?
+  id             String    @id @default(uuid())
+  adminUserId    String
+  customerUserId String
+  reason         String
+  consentGranted Boolean   @default(false)
+  consentToken   String?
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+  ipAddress      String?
 
-  admin           AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  admin AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
 
   @@index([adminUserId])
   @@index([customerUserId])
@@ -1829,13 +1807,13 @@ model ImpersonationSession {
 }
 
 model CustomerArchive {
-  id                String   @id @default(uuid())
-  originalCompanyId String   @unique
+  id                String    @id @default(uuid())
+  originalCompanyId String    @unique
   originalUserId    String
   archivedData      Json
   reason            String
   archivedBy        String
-  archivedAt        DateTime @default(now())
+  archivedAt        DateTime  @default(now())
   scheduledPurgeAt  DateTime
   restoredAt        DateTime?
   restoredBy        String?
@@ -1860,40 +1838,22 @@ model AdminNotification {
   @@map("admin_notifications")
 }
 
-model FeatureFlag {
-  id              String   @id @default(uuid())
-  key             String   @unique
-  name            String
-  description     String?
-  isEnabled       Boolean  @default(false)
-  rolloutPercent  Int      @default(0)
-  targetUsers     Json?
-  targetCompanies Json?
-  conditions      Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  updatedBy       String?
-
-  @@index([key])
-  @@map("feature_flags")
-}
-
 model Coupon {
-  id                String    @id @default(uuid())
-  code              String    @unique
-  description       String?
-  discountType      String
-  discountValue     Decimal   @db.Decimal(18, 2)
-  currency          String    @default("TRY")
-  maxRedemptions    Int?
-  redemptionCount   Int       @default(0)
-  validFrom         DateTime  @default(now())
-  validUntil        DateTime?
-  isActive          Boolean   @default(true)
-  applicableTiers   Json?
-  newCustomersOnly  Boolean   @default(false)
-  createdAt         DateTime  @default(now())
-  createdBy         String
+  id               String    @id @default(uuid())
+  code             String    @unique
+  description      String?
+  discountType     String
+  discountValue    Decimal   @db.Decimal(18, 2)
+  currency         String    @default("TRY")
+  maxRedemptions   Int?
+  redemptionCount  Int       @default(0)
+  validFrom        DateTime  @default(now())
+  validUntil       DateTime?
+  isActive         Boolean   @default(true)
+  applicableTiers  Json?
+  newCustomersOnly Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  createdBy        String
 
   @@index([code])
   @@index([isActive, validUntil])
@@ -1901,16 +1861,16 @@ model Coupon {
 }
 
 model SystemAlert {
-  id          String    @id @default(uuid())
-  type        String
-  severity    String
-  title       String
-  message     String
-  metadata    Json?
-  isResolved  Boolean   @default(false)
-  resolvedAt  DateTime?
-  resolvedBy  String?
-  createdAt   DateTime  @default(now())
+  id         String    @id @default(uuid())
+  type       String
+  severity   String
+  title      String
+  message    String
+  metadata   Json?
+  isResolved Boolean   @default(false)
+  resolvedAt DateTime?
+  resolvedBy String?
+  createdAt  DateTime  @default(now())
 
   @@index([severity, isResolved])
   @@index([type, createdAt])
