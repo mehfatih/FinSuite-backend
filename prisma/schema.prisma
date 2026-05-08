@@ -1789,20 +1789,27 @@ model AdminAuditLog {
 }
 
 model ImpersonationSession {
-  id             String    @id @default(uuid())
-  adminUserId    String
-  customerUserId String
-  reason         String
-  consentGranted Boolean   @default(false)
-  consentToken   String?
-  startedAt      DateTime  @default(now())
-  endedAt        DateTime?
-  ipAddress      String?
+  id                 String    @id @default(uuid())
+  adminUserId        String
+  adminEmail         String?
+  customerUserId     String
+  targetCustomerName String?
+  reason             String
+  consentGranted     Boolean   @default(false)
+  consentToken       String?
+  durationMinutes    Int       @default(30)
+  startedAt          DateTime  @default(now())
+  expiresAt          DateTime?
+  endedAt            DateTime?
+  endReason          String?
+  ipAddress          String?
+  userAgent          String?
 
   admin AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
 
   @@index([adminUserId])
   @@index([customerUserId])
+  @@index([expiresAt])
   @@map("impersonation_sessions")
 }
 

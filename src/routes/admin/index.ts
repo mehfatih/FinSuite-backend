@@ -3,11 +3,18 @@ import { authenticateAdmin } from "../../middleware/adminAuth";
 import { adminAuthController } from "../../controllers/admin/adminAuthController";
 import { adminStatsController } from "../../controllers/admin/adminStatsController";
 import { adminMerchantsController } from "../../controllers/admin/adminMerchantsController";
+import impersonationRouter from "./impersonation";
 
 const router = Router();
 
 router.post("/login",  adminAuthController.login);
 router.post("/setup",  adminAuthController.setup);
+
+// Impersonation routes mount BEFORE the global authenticateAdmin: the
+// `start` endpoint applies admin auth itself (per-route), while
+// `/impersonation/exit` and `/impersonation/status` use the customer
+// impersonation JWT, not the admin token.
+router.use(impersonationRouter);
 
 router.use(authenticateAdmin as any);
 
