@@ -6,6 +6,7 @@
 // ================================================================
 import { Request, Response, RequestHandler } from "express";
 import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
 import { prisma } from "../../config/database";
 import { env } from "../../config/env";
 import { AdminRequest } from "../../types";
@@ -64,21 +65,31 @@ export const adminImpersonationController = {
         return;
       }
 
+      const sessionId = randomUUID();
+      const startedAt = new Date();
       const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
 
-      const session = await prisma.impersonationSession.create({
-        data: {
-          adminUserId:        adminId,
-          adminEmail:         adminEmail,
-          customerUserId:     merchant.id,
-          targetCustomerName: merchant.name,
-          reason:             reason.trim(),
-          durationMinutes,
-          expiresAt,
-          ipAddress:          req.ip ?? null,
-          userAgent:          req.get("user-agent") ?? null,
-        },
-      });
+      // Raw SQL bypasses Prisma client schema validation — guards against a
+      // stale generated client whose model definition predates the migration.
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "impersonation_sessions" (
+           "id", "adminUserId", "adminEmail", "customerUserId", "targetCustomerName",
+           "reason", "durationMinutes", "startedAt", "expiresAt", "ipAddress", "userAgent"
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        sessionId,
+        adminId,
+        adminEmail,
+        merchant.id,
+        merchant.name,
+        reason.trim(),
+        durationMinutes,
+        startedAt,
+        expiresAt,
+        req.ip ?? null,
+        req.get("user-agent") ?? null
+      );
+
+      const session = { id: sessionId, startedAt, expiresAt };
 
       const claims: ImpersonationClaims = {
         id:                     merchant.id,
@@ -161,10 +172,14 @@ export const adminImpersonationController = {
         return;
       }
 
-      await prisma.impersonationSession.update({
-        where: { id: claims.impersonationSessionId },
-        data:  { endedAt: new Date(), endReason: "admin_exit" },
-      }).catch(() => undefined);
+      await prisma.$executeRawUnsafe(
+        `UPDATE "impersonation_sessions"
+         SET "endedAt" = $1, "endReason" = $2
+         WHERE "id" = $3`,
+        new Date(),
+        "admin_exit",
+        claims.impersonationSessionId
+      ).catch(() => undefined);
 
       await prisma.auditLog.create({
         data: {
@@ -213,14 +228,20 @@ export const adminImpersonationController = {
         return;
       }
 
-      const session = await prisma.impersonationSession.findUnique({
-        where: { id: claims.impersonationSessionId },
-      });
+      const rows = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT "id", "targetCustomerName", "customerUserId", "expiresAt",
+                "endedAt", "adminEmail", "reason"
+         FROM "impersonation_sessions"
+         WHERE "id" = $1
+         LIMIT 1`,
+        claims.impersonationSessionId
+      );
+      const session = rows?.[0];
       if (!session || session.endedAt) {
         res.status(200).json({ success: true, data: { active: false } });
         return;
       }
-      if (session.expiresAt && session.expiresAt < new Date()) {
+      if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
         res.status(200).json({ success: true, data: { active: false, expired: true } });
         return;
       }
