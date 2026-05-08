@@ -69,28 +69,25 @@ export const adminImpersonationController = {
       const startedAt = new Date();
       const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
 
-      // Raw SQL bypasses Prisma client schema validation — guards against a
-      // stale generated client whose model definition predates the migration.
-      // Column names are snake_case to match the actual production DB schema.
+      // Real impersonation_sessions schema has only 9 camelCase columns:
+      // id, adminUserId, customerUserId, reason, consentGranted, consentToken,
+      // startedAt, endedAt, ipAddress. expiresAt lives in the JWT exp claim.
+      // adminEmail / targetCustomerName / durationMinutes / userAgent are
+      // captured in the auditLog row below, not the impersonation row.
       await prisma.$executeRawUnsafe(
         `INSERT INTO "impersonation_sessions" (
-           "id", "admin_user_id", "admin_email",
-           "customer_user_id", "target_customer_name",
-           "reason", "duration_minutes",
-           "started_at", "expires_at",
-           "ip_address", "user_agent"
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+           "id", "adminUserId", "customerUserId",
+           "reason", "consentGranted", "consentToken",
+           "startedAt", "ipAddress"
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         sessionId,
         adminId,
-        adminEmail,
         merchant.id,
-        merchant.name,
         reason.trim(),
-        durationMinutes,
+        true,
+        randomUUID(),
         startedAt,
-        expiresAt,
-        req.ip ?? null,
-        req.get("user-agent") ?? null
+        req.ip ?? null
       );
 
       const session = { id: sessionId, startedAt, expiresAt };
@@ -178,10 +175,9 @@ export const adminImpersonationController = {
 
       await prisma.$executeRawUnsafe(
         `UPDATE "impersonation_sessions"
-         SET "ended_at" = $1, "end_reason" = $2
-         WHERE "id" = $3`,
+         SET "endedAt" = $1
+         WHERE "id" = $2`,
         new Date(),
-        "admin_exit",
         claims.impersonationSessionId
       ).catch(() => undefined);
 
@@ -235,11 +231,9 @@ export const adminImpersonationController = {
       const rows = await prisma.$queryRawUnsafe<any[]>(
         `SELECT
            "id",
-           "target_customer_name" AS "targetCustomerName",
-           "customer_user_id"     AS "customerUserId",
-           "expires_at"           AS "expiresAt",
-           "ended_at"             AS "endedAt",
-           "admin_email"          AS "adminEmail",
+           "customerUserId" AS "targetCustomerId",
+           "startedAt",
+           "endedAt",
            "reason"
          FROM "impersonation_sessions"
          WHERE "id" = $1
@@ -251,9 +245,25 @@ export const adminImpersonationController = {
         res.status(200).json({ success: true, data: { active: false } });
         return;
       }
-      if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
+
+      // expiresAt is not stored on the row — derive from the JWT exp claim.
+      const expiresAtFromToken = claims.exp ? new Date(claims.exp * 1000) : null;
+      if (expiresAtFromToken && expiresAtFromToken < new Date()) {
         res.status(200).json({ success: true, data: { active: false, expired: true } });
         return;
+      }
+
+      // targetCustomerName isn't stored on the impersonation row — fetch it
+      // fresh from the merchant table (same lookup pattern start uses).
+      let targetCustomerName = "";
+      try {
+        const target = await prisma.merchant.findUnique({
+          where: { id: session.targetCustomerId },
+          select: { name: true },
+        });
+        targetCustomerName = target?.name ?? "";
+      } catch {
+        targetCustomerName = "";
       }
 
       res.status(200).json({
@@ -261,10 +271,10 @@ export const adminImpersonationController = {
         data: {
           active:             true,
           sessionId:          session.id,
-          targetCustomerName: session.targetCustomerName ?? "",
-          targetCustomerId:   session.customerUserId,
-          expiresAt:          session.expiresAt,
-          adminEmail:         session.adminEmail ?? claims.originalAdminEmail,
+          targetCustomerName,
+          targetCustomerId:   session.targetCustomerId,
+          expiresAt:          expiresAtFromToken,
+          adminEmail:         claims.originalAdminEmail ?? "",
           reason:             session.reason,
         },
       });
