@@ -71,10 +71,14 @@ export const adminImpersonationController = {
 
       // Raw SQL bypasses Prisma client schema validation — guards against a
       // stale generated client whose model definition predates the migration.
+      // Column names are snake_case to match the actual production DB schema.
       await prisma.$executeRawUnsafe(
         `INSERT INTO "impersonation_sessions" (
-           "id", "adminUserId", "adminEmail", "customerUserId", "targetCustomerName",
-           "reason", "durationMinutes", "startedAt", "expiresAt", "ipAddress", "userAgent"
+           "id", "admin_user_id", "admin_email",
+           "customer_user_id", "target_customer_name",
+           "reason", "duration_minutes",
+           "started_at", "expires_at",
+           "ip_address", "user_agent"
          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         sessionId,
         adminId,
@@ -174,7 +178,7 @@ export const adminImpersonationController = {
 
       await prisma.$executeRawUnsafe(
         `UPDATE "impersonation_sessions"
-         SET "endedAt" = $1, "endReason" = $2
+         SET "ended_at" = $1, "end_reason" = $2
          WHERE "id" = $3`,
         new Date(),
         "admin_exit",
@@ -229,8 +233,14 @@ export const adminImpersonationController = {
       }
 
       const rows = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT "id", "targetCustomerName", "customerUserId", "expiresAt",
-                "endedAt", "adminEmail", "reason"
+        `SELECT
+           "id",
+           "target_customer_name" AS "targetCustomerName",
+           "customer_user_id"     AS "customerUserId",
+           "expires_at"           AS "expiresAt",
+           "ended_at"             AS "endedAt",
+           "admin_email"          AS "adminEmail",
+           "reason"
          FROM "impersonation_sessions"
          WHERE "id" = $1
          LIMIT 1`,
