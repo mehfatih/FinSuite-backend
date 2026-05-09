@@ -184,7 +184,7 @@ async function persistInsights(args: {
   for (const key of Object.keys(CARD_TYPE_MAP) as CardKey[]) {
     const card = brief?.[key];
     if (!card || !card.title) continue;
-    await prisma.insight.create({
+    const insight = await prisma.insight.create({
       data: {
         merchantId,
         type:        CARD_TYPE_MAP[key],
@@ -200,7 +200,42 @@ async function persistInsights(args: {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
+
+    // Sprint D-4 — emit a notification event for CRITICAL insights only.
+    // ATTENTION / OPPORTUNITY default to in-app only per
+    // NotificationPreference; firing them here would bypass the
+    // routing layer and over-notify. Same precedent as the original
+    // D-1 persistInsights addition: storage-and-event emission, not
+    // business logic. Best-effort — failures must not abort the
+    // brief response.
+    if (CARD_TYPE_MAP[key] === "CRITICAL") {
+      void notifyCriticalInsight({ insight, language }).catch((err) =>
+        console.error("[ai-brief] notification dispatch failed:", err?.message || err)
+      );
+    }
   }
+}
+
+// Sprint D-4 — fire a NotificationEvent for a freshly persisted CRITICAL
+// Insight. Imported lazily so the notification engine isn't pulled into
+// the hot path of brief generation.
+async function notifyCriticalInsight(args: {
+  insight: { id: string; merchantId: string; title: string; body: string; ctaLabel: string | null; ctaRoute: string | null };
+  language: string;
+}): Promise<void> {
+  const { dispatch } = await import("../../services/notifications/engine");
+  await dispatch({
+    merchantId: args.insight.merchantId,
+    severity:   "CRITICAL",
+    type:       "insight_critical",
+    title:      args.insight.title,
+    body:       args.insight.body,
+    iconTone:   "crimson",
+    ctaLabel:   args.insight.ctaLabel || undefined,
+    ctaRoute:   args.insight.ctaRoute || undefined,
+    insightId:  args.insight.id,
+    data:       { language: args.language }
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
