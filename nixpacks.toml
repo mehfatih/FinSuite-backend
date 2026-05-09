@@ -1,17 +1,66 @@
 # ============================================================
 # Zyrix FinSuite Backend - Nixpacks override
 #
-# Goal: Cut deploy time from ~17min to ~2-3min by stopping
-# Nixpacks from auto-installing chromium + 12 GUI libs via apt.
+# Sprint D-2.5 — Strategy A: re-add the Chromium runtime libs that
+# puppeteer's bundled Chromium needs to launch. Without these the
+# browser binary fails with `libglib-2.0.so.0: cannot open shared
+# object file` (and ~35 more in the standard Chromium dep chain).
 #
-# puppeteer (used only by invoicePdfController.ts) ships its own
-# chromium binary via npm during install - that takes ~30s instead
-# of 17 minutes.
+# History:
+#   - End-of-D-1 baseline had `aptPkgs = []` to cut deploy time.
+#   - That left Chromium unable to load shared libs ⇒ all PDF
+#     endpoints 500. Documented in
+#     `docs/sprint-d2.5-discovery-2026-05-10.md`.
+#   - Strategy A (this commit): explicit aptPkgs list, NO install-
+#     phase override (so we test Nixpacks's standard apt-install
+#     path cleanly). The 36 packages below are the canonical
+#     Chromium runtime list per Puppeteer's Debian/Ubuntu docs.
+#
+# Trade-off: deploy time +1-2 min vs. baseline (apt installs
+# ~150 MB of system libs). Still well below the ~17 min Nixpacks
+# auto-detect path.
 # ============================================================
 
 [phases.setup]
 nixPkgs = ["nodejs_20", "npm-9_x", "openssl"]
-aptPkgs = []
+aptPkgs = [
+  "ca-certificates",
+  "fonts-liberation",
+  "libasound2",
+  "libatk-bridge2.0-0",
+  "libatk1.0-0",
+  "libcairo2",
+  "libcups2",
+  "libdbus-1-3",
+  "libexpat1",
+  "libfontconfig1",
+  "libgbm1",
+  "libglib2.0-0",
+  "libgtk-3-0",
+  "libnspr4",
+  "libnss3",
+  "libpango-1.0-0",
+  "libpangocairo-1.0-0",
+  "libstdc++6",
+  "libx11-6",
+  "libx11-xcb1",
+  "libxcb1",
+  "libxcomposite1",
+  "libxcursor1",
+  "libxdamage1",
+  "libxext6",
+  "libxfixes3",
+  "libxi6",
+  "libxkbcommon0",
+  "libxrandr2",
+  "libxrender1",
+  "libxshmfence1",
+  "libxss1",
+  "libxtst6",
+  "lsb-release",
+  "wget",
+  "xdg-utils"
+]
 
 [phases.install]
 cmds = ["npm ci"]
@@ -24,5 +73,5 @@ cmd = "npx tsx src/index.ts"
 
 [variables]
 # Tell puppeteer to download its own chromium (small, fast)
-# instead of relying on a system package
+# instead of relying on a system package.
 PUPPETEER_SKIP_DOWNLOAD = "false"
