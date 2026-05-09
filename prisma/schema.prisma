@@ -1813,6 +1813,38 @@ model ImpersonationSession {
   @@map("impersonation_sessions")
 }
 
+model CustomerDashboardPreference {
+  id                String   @id @default(uuid())
+  customerUserId    String   @unique
+  kpiSlots          Json     @default("[\"mrr\",\"cash_runway\",\"customer_health_pct\",\"tax_burden\"]")
+  aiCoPilotFocus    String   @default("all")
+  sidebarCollapsed  Json     @default("{}")
+  language          String   @default("tr")
+  role              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([customerUserId])
+  @@map("customer_dashboard_preferences")
+}
+
+model CustomerDailyBrief {
+  id                String   @id @default(uuid())
+  customerUserId    String
+  briefDate         DateTime @db.Date
+  criticalCard      Json?
+  attentionCard     Json?
+  opportunityCard   Json?
+  focusArea         String   @default("all")
+  generatedAt       DateTime @default(now())
+  expiresAt         DateTime
+
+  @@unique([customerUserId, briefDate])
+  @@index([customerUserId, briefDate])
+  @@index([expiresAt])
+  @@map("customer_daily_brief")
+}
+
 model CustomerArchive {
   id                String    @id @default(uuid())
   originalCompanyId String    @unique
