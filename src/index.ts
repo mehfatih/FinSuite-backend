@@ -66,6 +66,11 @@ import customerCmdkRoutes from './routes/customer/cmdk';
 import customerInsightsRoutes from './routes/customer/insights';
 // Sprint D-2 — PDF export (insight, daily-brief, range-report)
 import customerPdfRoutes      from './routes/customer/pdf';
+// Sprint D-3 — Sharing recipients + share email/WhatsApp + history
+import customerRecipientsRoutes from './routes/customer/recipients';
+import customerSharingRoutes    from './routes/customer/sharing';
+// Sprint D-3 — Public PDF share endpoint (no auth; JWT-signed token)
+import publicShareRoutes        from './routes/publicShare';
 
 const app = express();
 
@@ -96,6 +101,11 @@ app.use("/api/admin",         adminRoutes);
 app.use('/api/customer/dashboard', customerDashboardPrefsRoutes);
 app.use('/api/customer/insights',  customerInsightsRoutes);
 app.use('/api/customer/pdf',       customerPdfRoutes);
+app.use('/api/customer/recipients', customerRecipientsRoutes);
+// Sprint D-3 — share endpoints share base path with sharing controller
+app.use('/api/customer',           customerSharingRoutes);
+// Public, no auth — JWT in :token is the credential
+app.use('/share',                  publicShareRoutes);
 app.use('/api/customer',           customerCmdkRoutes);
 app.use("/api/profile",       profileRoutes);
 app.use("/api/notifications", notificationRoutes);
