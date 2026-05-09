@@ -158,6 +158,52 @@ YANIT FORMATI: Sadece JSON döndür, başka hiçbir şey yazma:
 }
 
 // ─────────────────────────────────────────────────────────────
+// Sprint D-1 — Insight persistence.
+// Storage-only helper; called after the existing CustomerDailyBrief
+// upsert. Writes one row per card per generation. Schema additions
+// only — no change to Gemini interaction or sanitisation logic.
+// ─────────────────────────────────────────────────────────────
+type CardKey = "criticalCard" | "attentionCard" | "opportunityCard";
+const CARD_TYPE_MAP: Record<CardKey, "CRITICAL" | "ATTENTION" | "OPPORTUNITY"> = {
+  criticalCard:    "CRITICAL",
+  attentionCard:   "ATTENTION",
+  opportunityCard: "OPPORTUNITY",
+};
+
+async function persistInsights(args: {
+  merchantId: string;
+  brief: any;
+  snapshot: MerchantSnapshot;
+  language: string;
+  source: "gemini" | "fallback";
+  focus: string;
+}): Promise<void> {
+  const { merchantId, brief, snapshot, language, source, focus } = args;
+  const numericRefs = { ...snapshot.kpis, focus, currency: snapshot.currency };
+
+  for (const key of Object.keys(CARD_TYPE_MAP) as CardKey[]) {
+    const card = brief?.[key];
+    if (!card || !card.title) continue;
+    await prisma.insight.create({
+      data: {
+        merchantId,
+        type:        CARD_TYPE_MAP[key],
+        category:    focus,
+        title:       String(card.title || "").slice(0, 200),
+        body:        String(card.description || "").slice(0, 1000),
+        ctaLabel:    card.actionLabel ? String(card.actionLabel).slice(0, 60) : null,
+        ctaRoute:    card.actionRoute ? String(card.actionRoute).slice(0, 200) : null,
+        numericRefs,
+        language,
+        source,
+        // 7-day default lifetime for active visibility; UI can filter.
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 // Validate Gemini's parsed JSON shape; rewrite hallucinated routes.
 // Returns the sanitized brief, or null on bad shape.
 // ─────────────────────────────────────────────────────────────
@@ -306,6 +352,20 @@ export const aiBriefController = {
           expiresAt:       next6am(),
         },
       }).catch(() => undefined);
+
+      // Sprint D-1 — also persist each card to the immutable Insight log.
+      // This is storage-only; Gemini / snapshot / sanitize logic is untouched.
+      // Failure to write Insights must NOT degrade the brief response.
+      void persistInsights({
+        merchantId: userId,
+        brief,
+        snapshot,
+        language,
+        source: generated ? "gemini" : "fallback",
+        focus,
+      }).catch((err) =>
+        console.error("[customer/dashboard/ai-brief] insight persist failed:", err?.message || err)
+      );
 
       res.status(200).json({
         success: true,
