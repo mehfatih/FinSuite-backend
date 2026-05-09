@@ -21,6 +21,7 @@ import { buildMerchantSnapshot, MerchantSnapshot } from "../../services/customer
 const h = (fn: Function): RequestHandler => fn as RequestHandler;
 
 const genAI = env.geminiApiKey ? new GoogleGenerativeAI(env.geminiApiKey) : null;
+console.log("[ai-brief] startup: GEMINI_API_KEY present:", !!env.geminiApiKey, "length:", (env.geminiApiKey || "").length);
 
 const FOCUS_AREAS = ["all", "cash", "sales", "tax", "customers", "operations"];
 
@@ -195,7 +196,10 @@ function closestAllowed(route: string): string {
 // Gemini call with 8s timeout.
 // ─────────────────────────────────────────────────────────────
 async function callGemini(snapshot: MerchantSnapshot): Promise<any | null> {
-  if (!genAI) return null;
+  if (!genAI) {
+    console.error("[ai-brief] callGemini: genAI is null — GEMINI_API_KEY missing at boot");
+    return null;
+  }
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const prompt = buildPrompt(snapshot);
@@ -204,13 +208,32 @@ async function callGemini(snapshot: MerchantSnapshot): Promise<any | null> {
       model.generateContent(prompt),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
     ]);
-    if (!result) return null;
+    if (!result) {
+      console.error("[ai-brief] callGemini: timeout or null result from Gemini (>8s or race resolved null)");
+      return null;
+    }
 
     const text = (result as any).response?.text?.() || "";
+    if (!text) {
+      console.error("[ai-brief] callGemini: empty text from Gemini response");
+      return null;
+    }
     const cleaned = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
-    return sanitizeBrief(parsed);
-  } catch {
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (parseErr: any) {
+      console.error("[ai-brief] callGemini: JSON.parse failed:", parseErr?.message, "cleaned text:", cleaned.slice(0, 500));
+      return null;
+    }
+    const sanitized = sanitizeBrief(parsed);
+    if (!sanitized) {
+      console.error("[ai-brief] callGemini: sanitizeBrief rejected shape. Parsed:", JSON.stringify(parsed).slice(0, 500));
+      return null;
+    }
+    return sanitized;
+  } catch (err: any) {
+    console.error("[ai-brief] callGemini: threw error:", err?.message || err, err?.stack?.slice(0, 300));
     return null;
   }
 }
