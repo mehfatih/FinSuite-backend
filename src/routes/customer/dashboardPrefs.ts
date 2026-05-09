@@ -6,11 +6,16 @@
 import { Router } from "express";
 import { authenticate } from "../../middleware/auth";
 import { customerDashboardPrefsController } from "../../controllers/customer/customerDashboardPrefsController";
+import { aiBriefController } from "../../controllers/customer/aiBriefController";
 
 const router = Router();
 
 router.get(   "/preferences",      authenticate, customerDashboardPrefsController.getPreferences);
 router.patch( "/preferences",      authenticate, customerDashboardPrefsController.updatePreferences);
 router.get(   "/preferences/kpis", authenticate, customerDashboardPrefsController.listAvailableKpis);
+
+// Phase 15 — AI Co-Pilot daily brief
+router.get(   "/ai-brief",         authenticate, aiBriefController.getBrief);
+router.post(  "/ai-brief/refresh", authenticate, aiBriefController.refresh);
 
 export default router;
