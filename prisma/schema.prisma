@@ -427,6 +427,8 @@ model Merchant {
   benchmarkData          BenchmarkSnapshot[]
   otpCodes               OtpCode[]
   insights               Insight[]
+  sharingRecipients      SharingRecipient[]
+  insightShares          InsightShare[]
 
   @@map("merchants")
 }
@@ -1935,10 +1937,60 @@ model Insight {
   dismissedAt   DateTime?
   resolvedAt    DateTime?
   merchant      Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  shares        InsightShare[]
 
   @@index([merchantId, status, generatedAt])
   @@index([merchantId, type, status])
   @@map("insights")
+}
+
+// =====================================================================
+// Sprint D-3 — Sharing recipients + insight share log.
+// =====================================================================
+model SharingRecipient {
+  id           String    @id @default(cuid())
+  merchantId   String
+  name         String
+  email        String?
+  phone        String?
+  role         String?
+  avatarUrl    String?
+  lastUsedAt   DateTime?
+  shareCount   Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  merchant     Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  shares       InsightShare[]
+
+  @@index([merchantId, lastUsedAt])
+  @@map("sharing_recipients")
+}
+
+model InsightShare {
+  id                String    @id @default(cuid())
+  merchantId        String
+  insightId         String?
+  reportType        String
+  channel           String
+  recipientId       String?
+  recipientSnapshot Json
+  message           String    @db.Text
+  pdfShareToken     String?   @unique
+  status            String    @default("sent")
+  sentAt            DateTime  @default(now())
+  deliveredAt       DateTime?
+  openedAt          DateTime?
+  errorMessage      String?
+  downloadCount     Int       @default(0)
+  firstDownloadedAt DateTime?
+  merchant          Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  insight           Insight?          @relation(fields: [insightId], references: [id], onDelete: SetNull)
+  recipient         SharingRecipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+
+  @@index([merchantId, sentAt])
+  @@index([recipientId, sentAt])
+  @@index([pdfShareToken])
+  @@map("insight_shares")
 }
 
 model SystemAlert {
