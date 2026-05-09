@@ -59,10 +59,10 @@ aptPkgs = [
 cmds = ["npm ci"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["npm install && npx prisma generate"]
 
 [start]
-cmd = "node dist/index.js"
+cmd = "npx tsx src/index.ts"
 
 [variables]
 # Puppeteer ships its own Chromium via npm install; we just provide
