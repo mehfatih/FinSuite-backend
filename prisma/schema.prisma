@@ -426,6 +426,7 @@ model Merchant {
   taxEvents              TaxEvent[]
   benchmarkData          BenchmarkSnapshot[]
   otpCodes               OtpCode[]
+  insights               Insight[]
 
   @@map("merchants")
 }
@@ -1897,6 +1898,47 @@ model Coupon {
   @@index([code])
   @@index([isActive, validUntil])
   @@map("coupons")
+}
+
+// =====================================================================
+// Sprint D-1 — Insight model. Coexists with CustomerDailyBrief (cache);
+// Insight is the immutable history log. See docs/sprint-d1-discovery.
+// =====================================================================
+enum InsightType {
+  CRITICAL
+  ATTENTION
+  OPPORTUNITY
+}
+
+enum InsightStatus {
+  ACTIVE
+  DISMISSED
+  RESOLVED
+  ARCHIVED
+}
+
+model Insight {
+  id            String        @id @default(cuid())
+  merchantId    String
+  type          InsightType
+  category      String
+  title         String
+  body          String        @db.Text
+  ctaLabel      String?
+  ctaRoute      String?
+  numericRefs   Json?
+  language      String
+  source        String
+  status        InsightStatus @default(ACTIVE)
+  generatedAt   DateTime      @default(now())
+  expiresAt     DateTime?
+  dismissedAt   DateTime?
+  resolvedAt    DateTime?
+  merchant      Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId, status, generatedAt])
+  @@index([merchantId, type, status])
+  @@map("insights")
 }
 
 model SystemAlert {
