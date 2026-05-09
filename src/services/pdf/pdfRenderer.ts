@@ -21,26 +21,8 @@
 //   renderPdf({ html, format?, margin?, metadata? }) → Promise<Buffer>
 //   shutdownRenderer() → Promise<void>   (graceful close on exit)
 // ================================================================
+import puppeteer, { Browser, PaperFormat } from 'puppeteer';
 import { PDFDocument } from 'pdf-lib';
-import type { Browser, PaperFormat } from 'puppeteer';
-
-// Dual-mode launcher: on Linux containers (Railway), use puppeteer-core
-// + @sparticuz/chromium which ships a self-contained Chromium with all
-// runtime libs bundled — bypasses the missing-libglib problem entirely.
-// On dev (Windows/macOS) fall back to bundled puppeteer.
-async function launchBrowserCrossPlatform(args: string[]): Promise<Browser> {
-  if (process.platform === 'linux') {
-    const puppeteerCore = (await import('puppeteer-core')).default;
-    const chromium      = (await import('@sparticuz/chromium')).default;
-    return puppeteerCore.launch({
-      headless: true,
-      args:           [...chromium.args, ...args],
-      executablePath: await chromium.executablePath()
-    }) as unknown as Browser;
-  }
-  const puppeteer = (await import('puppeteer')).default;
-  return puppeteer.launch({ headless: true, args });
-}
 
 const POOL_SIZE = Math.max(1, Math.min(4, parseInt(process.env.PDF_MAX_BROWSERS || '2', 10) || 2));
 const MAX_RENDERS_PER_BROWSER = 50;
@@ -69,7 +51,10 @@ const LAUNCH_ARGS = [
 ];
 
 async function launchBrowser(): Promise<Browser> {
-  const browser = await launchBrowserCrossPlatform(LAUNCH_ARGS);
+  const browser = await puppeteer.launch({
+    headless: true,
+    args:     LAUNCH_ARGS
+  });
   // Auto-clear from pool on disconnect (crash, OOM-kill, etc.).
   browser.on('disconnected', () => {
     const idx = pool.findIndex((p) => p.browser === browser);
