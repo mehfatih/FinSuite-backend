@@ -10,7 +10,9 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "seed:admin": "tsx prisma/seeds/superAdmin.ts"
+    "seed:admin": "tsx prisma/seeds/superAdmin.ts",
+    "seed:test-merchants": "tsx prisma/seeds/testMerchants.ts",
+    "cleanup:test-merchants": "tsx prisma/seeds/cleanupTestMerchants.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
