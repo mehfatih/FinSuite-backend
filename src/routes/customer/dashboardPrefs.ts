@@ -7,6 +7,7 @@ import { Router } from "express";
 import { authenticate } from "../../middleware/auth";
 import { customerDashboardPrefsController } from "../../controllers/customer/customerDashboardPrefsController";
 import { aiBriefController } from "../../controllers/customer/aiBriefController";
+import { kpiValuesController } from "../../controllers/customer/kpiValuesController";
 
 const router = Router();
 
@@ -17,5 +18,8 @@ router.get(   "/preferences/kpis", authenticate, customerDashboardPrefsControlle
 // Phase 15 — AI Co-Pilot daily brief
 router.get(   "/ai-brief",         authenticate, aiBriefController.getBrief);
 router.post(  "/ai-brief/refresh", authenticate, aiBriefController.refresh);
+
+// Phase 16 — Real KPI values
+router.get(   "/kpi-values",       authenticate, kpiValuesController.getKpiValues);
 
 export default router;
