@@ -74,6 +74,13 @@ import publicShareRoutes        from './routes/publicShare';
 // Sprint D-4 — Notifications V2 + preferences
 import customerNotificationsV2Routes from './routes/customer/notificationsV2';
 import customerPreferencesRoutes     from './routes/customer/preferences';
+// Sprint D-4 — Web Push subscription endpoints
+import customerWebPushRoutes         from './routes/customer/webPush';
+// Sprint D-4 — Resend email webhook (deliveredAt / openedAt for D-3 shares)
+import resendWebhookRoutes           from './routes/webhooks/resend';
+// Sprint D-4 — register Web Push channel into the notification engine
+import { configureWebPush, webPushChannel } from './services/notifications/channels/webPushChannel';
+import { registerChannel }                  from './services/notifications/engine';
 
 const app = express();
 
@@ -112,7 +119,16 @@ app.use('/share',                  publicShareRoutes);
 // Sprint D-4 — V2 notification feed + preferences
 app.use('/api/customer/notifications', customerNotificationsV2Routes);
 app.use('/api/customer/preferences',   customerPreferencesRoutes);
+app.use('/api/customer/web-push',      customerWebPushRoutes);
+// Sprint D-4 — public Resend webhook (HMAC-verified inside; no auth)
+app.use('/api/webhooks',               resendWebhookRoutes);
 app.use('/api/customer',           customerCmdkRoutes);
+
+// Sprint D-4 — register the Web Push channel into the engine if VAPID
+// env vars are present. Safe no-op when they're absent.
+if (configureWebPush()) {
+  registerChannel(webPushChannel);
+}
 app.use("/api/profile",       profileRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/payments",      paymentRoutes);
