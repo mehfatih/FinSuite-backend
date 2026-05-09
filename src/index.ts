@@ -58,6 +58,10 @@ import securityRoutes from './routes/security';
 import { auditLogger } from './middleware/auditLogger';
 // Phase 14 — Admin Operations Center
 import adminAuthRoutes from './routes/admin/auth';
+// Phase 15 — Customer Dashboard V2 preferences
+import customerDashboardPrefsRoutes from './routes/customer/dashboardPrefs';
+// Phase 15 — Customer Cmd+K AI intent
+import customerCmdkRoutes from './routes/customer/cmdk';
 
 const app = express();
 
@@ -84,6 +88,9 @@ app.use("/api/public-ai-demo", publicAiDemoRoutes);
 // so the public login/2FA endpoints aren't intercepted by adminRoutes' authenticateAdmin middleware.
 app.use('/api/admin/auth',    adminAuthRoutes);
 app.use("/api/admin",         adminRoutes);
+// Phase 15 — Customer Dashboard V2 preferences + Cmd+K
+app.use('/api/customer/dashboard', customerDashboardPrefsRoutes);
+app.use('/api/customer',           customerCmdkRoutes);
 app.use("/api/profile",       profileRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/payments",      paymentRoutes);
