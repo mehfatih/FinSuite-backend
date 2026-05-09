@@ -19,6 +19,7 @@
 import { Request, Response, RequestHandler, NextFunction } from "express";
 import { prisma } from "../config/database";
 import { verifyShareToken } from "../services/sharing/shareToken";
+import { emitShareEvent } from "../services/sharing/shareEvents";
 import { renderPdf } from "../services/pdf/pdfRenderer";
 import { renderInsightCardTemplate } from "../services/pdf/templates/insightCard";
 import { renderDailyBriefTemplate, DailyBriefCard } from "../services/pdf/templates/dailyBrief";
@@ -214,6 +215,12 @@ export const publicShareController = {
           firstDownloadedAt: share.firstDownloadedAt ?? new Date()
         }
       }).catch(() => undefined);
+      emitShareEvent({
+        type: "share.downloaded",
+        shareId: share.id,
+        merchantId: share.merchantId,
+        channel: share.channel as "email" | "whatsapp"
+      });
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="${filename}"`);

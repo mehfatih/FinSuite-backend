@@ -29,6 +29,7 @@ import { signShareToken } from "../../services/sharing/shareToken";
 import { e164, isValidE164 } from "../../services/sharing/phone";
 import { sendShareEmail } from "../../services/sharing/sendShareEmail";
 import { buildWaShareLink } from "../../services/sharing/waLink";
+import { emitShareEvent } from "../../services/sharing/shareEvents";
 
 const h = (fn: Function): RequestHandler => fn as RequestHandler;
 
@@ -305,11 +306,8 @@ async function touchRecipient(recipientId: string): Promise<void> {
   }).catch(() => undefined);
 }
 
-// ─── Note for the D-4 notification handoff ────────────────────
-function emitShareEvent(_event: { type: string; shareId: string; merchantId: string; channel: string }): void {
-  // Sprint D-3: event sink is a no-op. D-4 notification engine
-  // wires this to the in-app toast + persistent notification log.
-}
+// Share event sink — see src/services/sharing/shareEvents.ts.
+// D-4 notification engine subscribes there without controller changes.
 
 // ─── Endpoints ─────────────────────────────────────────────────
 export const sharingController = {
