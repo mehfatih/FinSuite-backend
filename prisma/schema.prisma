@@ -429,6 +429,8 @@ model Merchant {
   insights               Insight[]
   sharingRecipients      SharingRecipient[]
   insightShares          InsightShare[]
+  notificationPreference NotificationPreference?
+  webPushSubscriptions   WebPushSubscription[]
 
   @@map("merchants")
 }
@@ -1128,18 +1130,86 @@ model TeamMember {
 }
 
 model Notification {
-  id         String           @id @default(uuid())
-  merchantId String
-  title      String
-  message    String?
-  body       String?
-  type       NotificationType @default(INFO)
-  isRead     Boolean          @default(false)
-  data       Json?
-  createdAt  DateTime         @default(now())
-  merchant   Merchant         @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  id            String           @id @default(uuid())
+  merchantId    String
+  title         String
+  message       String?
+  body          String?
+  type          NotificationType @default(INFO)
+  isRead        Boolean          @default(false)
+  data          Json?
+  createdAt     DateTime         @default(now())
 
+  // Sprint D-4 additions — additive, backward-compatible.
+  // Optional severity for the cinematic notification center
+  // (CRITICAL/ATTENTION/OPPORTUNITY/SHARE_EVENT/SYSTEM). Distinct from
+  // the legacy `type` column which is repurposed by older controllers.
+  severity      String?
+  iconTone      String?          // 'cyan' | 'violet' | 'mint' | 'amber' | 'crimson'
+  ctaLabel      String?
+  ctaRoute      String?
+  channelsSent  String[]         @default([])  // ['inapp','email','webpush','mobilepush']
+  insightId     String?
+  shareId       String?
+  readAt        DateTime?
+  archived      Boolean          @default(false)
+
+  merchant      Merchant         @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  insight       Insight?         @relation(fields: [insightId], references: [id], onDelete: SetNull)
+
+  @@index([merchantId, isRead, createdAt])
+  @@index([merchantId, archived, createdAt])
+  @@index([insightId])
   @@map("notifications")
+}
+
+// =====================================================================
+// Sprint D-4 — Notification preferences + Web Push subscriptions.
+// =====================================================================
+model NotificationPreference {
+  id                  String    @id @default(cuid())
+  merchantId          String    @unique
+
+  // Per-channel master toggles
+  inappEnabled        Boolean   @default(true)
+  emailEnabled        Boolean   @default(true)
+  webPushEnabled      Boolean   @default(false)
+  mobilePushEnabled   Boolean   @default(false)   // forward-compat slot; no driver yet
+
+  // Per-event-type subscription matrix
+  criticalChannels    String[]  @default(["inapp","email","webpush"])
+  attentionChannels   String[]  @default(["inapp","email"])
+  opportunityChannels String[]  @default(["inapp"])
+  shareEventChannels  String[]  @default(["inapp"])
+
+  // Smart batching
+  digestFrequency     String    @default("instant")  // instant | hourly | daily | never
+  quietHoursStart     Int?
+  quietHoursEnd       Int?
+
+  // Mute kill-switch
+  mutedUntil          DateTime?
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  merchant            Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model WebPushSubscription {
+  id          String   @id @default(cuid())
+  merchantId  String
+  endpoint    String   @unique
+  p256dh      String
+  auth        String
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  merchant    Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@map("web_push_subscriptions")
 }
 
 model Subscription {
@@ -1938,6 +2008,7 @@ model Insight {
   resolvedAt    DateTime?
   merchant      Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   shares        InsightShare[]
+  notifications Notification[]
 
   @@index([merchantId, status, generatedAt])
   @@index([merchantId, type, status])
@@ -1977,6 +2048,7 @@ model InsightShare {
   message           String    @db.Text
   pdfShareToken     String?   @unique
   status            String    @default("sent")
+  providerMessageId String?                                   // Resend email ID — used by D-4 webhook to update deliveredAt/openedAt
   sentAt            DateTime  @default(now())
   deliveredAt       DateTime?
   openedAt          DateTime?
