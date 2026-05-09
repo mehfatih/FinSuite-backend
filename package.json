@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "prisma generate && tsc",
+    "build": "prisma generate && tsc && node scripts/copy-pdf-assets.js",
     "start": "node dist/index.js",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
@@ -26,6 +26,7 @@
     "helmet": "^8.0.0",
     "iyzipay": "^2.0.67",
     "jsonwebtoken": "^9.0.2",
+    "pdf-lib": "^1.17.1",
     "puppeteer": "^24.41.0",
     "react-router-dom": "^7.14.1",
     "resend": "^6.12.0",
