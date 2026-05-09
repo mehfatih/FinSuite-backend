@@ -64,6 +64,8 @@ import customerDashboardPrefsRoutes from './routes/customer/dashboardPrefs';
 import customerCmdkRoutes from './routes/customer/cmdk';
 // Sprint D-1 — Insight history + status
 import customerInsightsRoutes from './routes/customer/insights';
+// Sprint D-2 — PDF export (insight, daily-brief, range-report)
+import customerPdfRoutes      from './routes/customer/pdf';
 
 const app = express();
 
@@ -93,6 +95,7 @@ app.use("/api/admin",         adminRoutes);
 // Phase 15 — Customer Dashboard V2 preferences + Cmd+K
 app.use('/api/customer/dashboard', customerDashboardPrefsRoutes);
 app.use('/api/customer/insights',  customerInsightsRoutes);
+app.use('/api/customer/pdf',       customerPdfRoutes);
 app.use('/api/customer',           customerCmdkRoutes);
 app.use("/api/profile",       profileRoutes);
 app.use("/api/notifications", notificationRoutes);
