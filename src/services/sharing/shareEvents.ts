@@ -27,14 +27,47 @@ export interface ShareEvent {
 }
 
 /**
- * Emit a share status event. Sprint D-3: log only. D-4 will wire
- * this into the notification engine (subscriber pattern), without
- * any controller-side change required.
+ * Emit a share status event. Sprint D-3 logged only; Sprint D-4
+ * forwards interesting events into the notification engine. The
+ * default `shareEventChannels` is `["inapp"]` so the merchant gets
+ * a quiet bell notification when their accountant opens / downloads
+ * the share — no email or push by default.
+ *
+ * Best-effort fan-out — failures are logged but never thrown.
  */
 export function emitShareEvent(event: ShareEvent): void {
-  // Logging keeps the audit trail visible in Railway logs in the
-  // meantime, and lets us prove the wiring is correct end-to-end.
   console.log(
     `[share.event] ${event.type} share=${event.shareId} merchant=${event.merchantId} channel=${event.channel}`
   );
+  // Only "informative" events go to the notification feed. Failures
+  // and bare "sent" events stay in the share-history audit log only.
+  if (event.type === "share.delivered" || event.type === "share.opened" || event.type === "share.downloaded") {
+    void forwardToNotificationEngine(event).catch((err) =>
+      console.error("[share.event] notification dispatch failed:", err?.message || err)
+    );
+  }
+}
+
+async function forwardToNotificationEngine(event: ShareEvent): Promise<void> {
+  const { dispatch } = await import("../notifications/engine");
+  const titles = {
+    "share.delivered":  "Paylaşım ulaştı",
+    "share.opened":     "Paylaşım açıldı",
+    "share.downloaded": "Paylaşım indirildi"
+  } as const;
+  const bodies = {
+    "share.delivered":  "Paylaştığın dosya alıcının kutusuna ulaştı.",
+    "share.opened":     "Alıcı paylaştığın brifingi açtı.",
+    "share.downloaded": "Alıcı paylaştığın PDF'i indirdi."
+  } as const;
+  await dispatch({
+    merchantId: event.merchantId,
+    severity:   "SHARE_EVENT",
+    type:       event.type,
+    title:      (titles as any)[event.type] || "Paylaşım güncellemesi",
+    body:       (bodies as any)[event.type] || "",
+    iconTone:   "cyan",
+    shareId:    event.shareId,
+    data:       { channel: event.channel, ...(event.metadata || {}) }
+  });
 }
