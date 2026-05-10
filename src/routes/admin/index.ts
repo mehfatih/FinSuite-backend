@@ -4,6 +4,7 @@ import { adminAuthController } from "../../controllers/admin/adminAuthController
 import { adminStatsController } from "../../controllers/admin/adminStatsController";
 import { adminMerchantsController } from "../../controllers/admin/adminMerchantsController";
 import { adminEmailEngagementController } from "../../controllers/admin/adminEmailEngagementController";
+import { adminAiUsageController } from "../../controllers/admin/adminAiUsageController";
 import impersonationRouter from "./impersonation";
 
 const router = Router();
@@ -41,5 +42,11 @@ router.delete("/merchants/:id",                   adminMerchantsController.delet
 router.get("/email-engagement",                              adminEmailEngagementController.getStats);
 router.get("/email-engagement/bounced",                      adminEmailEngagementController.getBounced);
 router.post("/email-engagement/:merchantId/re-enable",       adminEmailEngagementController.reEnable);
+
+// Sprint D-10 — AI usage observability (D-8 ChatMessage tokens columns).
+router.get("/ai-usage/summary",        adminAiUsageController.summary);
+router.get("/ai-usage/daily",          adminAiUsageController.daily);
+router.get("/ai-usage/top-merchants",  adminAiUsageController.topMerchants);
+router.get("/ai-usage/latency",        adminAiUsageController.latency);
 
 export default router;
