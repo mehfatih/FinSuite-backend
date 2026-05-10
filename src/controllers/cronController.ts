@@ -6,6 +6,7 @@ import { Request, Response, RequestHandler } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { Resend } from 'resend';
 import { runMorningBriefTick } from '../services/morningBrief/scheduler';
+import { runWeeklyReportTick } from '../services/weeklyReport/scheduler';
 
 const prisma = new PrismaClient();
 const resend  = new Resend(process.env.RESEND_API_KEY);
@@ -362,6 +363,26 @@ export const runMorningBrief = h(async (req: Request, res: Response) => {
     res.json({ success: true, data: result });
   } catch (err: any) {
     console.error('[Cron] morning-brief-tick error:', err?.message || err);
+    res.status(500).json({ success: false, error: 'Cron job failed' });
+  }
+});
+
+// ── Sprint D-6 — Weekly Report Tick ──────────────────────────
+// POST /api/cron/weekly-report-tick
+// Triggered every 15 min by cron-job.org with the x-cron-secret
+// header. Fires on Sunday 18:00 local for each enabled subscription;
+// 6-day double-fire guard ensures the next tick within the same
+// local hour skips.
+export const runWeeklyReport = h(async (req: Request, res: Response) => {
+  const secret = req.headers['x-cron-secret'];
+  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const result = await runWeeklyReportTick();
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    console.error('[Cron] weekly-report-tick error:', err?.message || err);
     res.status(500).json({ success: false, error: 'Cron job failed' });
   }
 });

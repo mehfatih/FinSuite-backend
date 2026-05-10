@@ -5,6 +5,7 @@ import {
   sendTaxCalendarReminders,
   processRecurringInvoices,
   runMorningBrief,
+  runWeeklyReport,
 } from '../controllers/cronController';
 
 const router = Router();
@@ -17,7 +18,10 @@ router.post('/reminders/installments',     sendInstallmentReminders);
 router.post('/reminders/tax-calendar',     sendTaxCalendarReminders);
 router.post('/process-recurring',          processRecurringInvoices);
 
-// Sprint D-5 — every 15 min, Railway cron POSTs here with x-cron-secret
+// Sprint D-5 — every 15 min, cron-job.org POSTs here with x-cron-secret
 router.post('/morning-brief-tick',         runMorningBrief);
+
+// Sprint D-6 — every 15 min, cron-job.org POSTs here with x-cron-secret
+router.post('/weekly-report-tick',         runWeeklyReport);
 
 export default router;
