@@ -438,6 +438,7 @@ model Merchant {
   weeklyReportSends      WeeklyReportSend[]
   publicShareLinks       PublicShareLink[]
   chatConversations      ChatConversation[]
+  slackInstallations     SlackInstallation[]
 
   @@map("merchants")
 }
@@ -1182,12 +1183,18 @@ model NotificationPreference {
   emailEnabled        Boolean   @default(true)
   webPushEnabled      Boolean   @default(false)
   mobilePushEnabled   Boolean   @default(false)   // forward-compat slot; no driver yet
+  slackEnabled        Boolean   @default(false)   // Sprint D-9 — flips on after first SlackInstallation
+  teamsEnabled        Boolean   @default(false)   // Sprint D-9 — Teams driver deferred to V2
 
   // Per-event-type subscription matrix
   criticalChannels    String[]  @default(["inapp","email","webpush"])
   attentionChannels   String[]  @default(["inapp","email"])
   opportunityChannels String[]  @default(["inapp"])
   shareEventChannels  String[]  @default(["inapp"])
+  // Sprint D-9 — per-severity Slack subscription. Defaults are conservative
+  // (only critical + attention) so a fresh install doesn't spam #general.
+  slackChannels       String[]  @default(["CRITICAL","ATTENTION"])
+  teamsChannels       String[]  @default([])
 
   // Smart batching
   digestFrequency     String    @default("instant")  // instant | hourly | daily | never
@@ -2348,4 +2355,80 @@ model ChatMessage {
 
   @@index([conversationId, createdAt])
   @@map("chat_messages")
+}
+
+// =====================================================================
+// Sprint D-9 — Slack workspace integration.
+//
+//   SlackInstallation     — one row per Slack workspace a merchant
+//                           connects. botToken stored AES-256-GCM
+//                           encrypted via utils/encryption.ts (same key
+//                           as 2FA secrets). uninstalledAt soft-delete
+//                           preserves outbound audit trail; the channel
+//                           driver filters on uninstalledAt IS NULL.
+//
+//   SlackChannelMapping   — one row per (installation, severity) routing
+//                           rule. severity == 'all' acts as fallback.
+//                           Hard rule: no defaults (no auto-#general).
+//
+//   SlackOutboundLog      — outbound audit + idempotency. Channel driver
+//                           checks for an existing ok=true row keyed on
+//                           (installationId, insightId) before posting,
+//                           so a re-fired event won't duplicate.
+//
+// All scoped to merchantId; spec's `companyId / userId` translated per
+// project hard rule. Teams models intentionally omitted (decision §10.A).
+// =====================================================================
+model SlackInstallation {
+  id                  String                  @id @default(cuid())
+  merchantId          String
+  workspaceId         String                                  // Slack team_id (T…)
+  workspaceName       String
+  botToken            String                                  // AES-256-GCM ciphertext (utils/encryption.ts)
+  botUserId           String                                  // U… for "is this me" filtering
+  incomingWebhookUrl  String?                                 // optional, encrypted; ONLY when user picks default channel
+  scope               String                                  // granted scopes from /oauth/v2/access
+  installedAt         DateTime                @default(now())
+  uninstalledAt       DateTime?
+  merchant            Merchant                @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  channelMappings     SlackChannelMapping[]
+  outboundLogs        SlackOutboundLog[]
+
+  @@unique([merchantId, workspaceId])
+  @@index([merchantId, uninstalledAt])
+  @@map("slack_installations")
+}
+
+model SlackChannelMapping {
+  id              String             @id @default(cuid())
+  installationId  String
+  insightType     String                                       // 'CRITICAL' | 'ATTENTION' | 'OPPORTUNITY' | 'SHARE_EVENT' | 'all'
+  channelId       String                                       // Slack C… or G… id
+  channelName     String                                       // for display only; re-fetched on use
+  enabled         Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  installation    SlackInstallation  @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  @@unique([installationId, insightType, channelId])
+  @@index([installationId, enabled])
+  @@map("slack_channel_mappings")
+}
+
+model SlackOutboundLog {
+  id              String             @id @default(cuid())
+  installationId  String
+  insightId       String?                                      // null for slash-command replies / test sends
+  notificationId  String?                                      // links back to D-4 Notification row
+  channelId       String
+  slackTs         String?                                      // Slack message ts ("1715300000.001234"); null on failure
+  ok              Boolean
+  errorCode       String?
+  rawError        String?
+  postedAt        DateTime           @default(now())
+  installation    SlackInstallation  @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  @@index([installationId, postedAt])
+  @@index([insightId])
+  @@map("slack_outbound_logs")
 }
