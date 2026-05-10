@@ -3,6 +3,7 @@ import { authenticateAdmin } from "../../middleware/adminAuth";
 import { adminAuthController } from "../../controllers/admin/adminAuthController";
 import { adminStatsController } from "../../controllers/admin/adminStatsController";
 import { adminMerchantsController } from "../../controllers/admin/adminMerchantsController";
+import { adminEmailEngagementController } from "../../controllers/admin/adminEmailEngagementController";
 import impersonationRouter from "./impersonation";
 
 const router = Router();
@@ -35,5 +36,10 @@ router.post("/merchants/:id/unarchive",           adminMerchantsController.unarc
 router.post("/merchants/:id/reset-password",      adminMerchantsController.resetPassword);
 router.get("/merchants/:id/audit",                adminMerchantsController.getAuditLog);
 router.delete("/merchants/:id",                   adminMerchantsController.delete);
+
+// Sprint D-5 — morning brief engagement dashboard
+router.get("/email-engagement",                              adminEmailEngagementController.getStats);
+router.get("/email-engagement/bounced",                      adminEmailEngagementController.getBounced);
+router.post("/email-engagement/:merchantId/re-enable",       adminEmailEngagementController.reEnable);
 
 export default router;
