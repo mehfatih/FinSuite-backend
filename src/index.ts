@@ -97,6 +97,8 @@ import slackIntegrationRoutes from './routes/integrations/slack';
 // Sprint D-4 — register Web Push channel into the notification engine
 import { configureWebPush, webPushChannel } from './services/notifications/channels/webPushChannel';
 import { registerChannel }                  from './services/notifications/engine';
+// Sprint D-9 — register Slack channel into the notification engine
+import { configureSlackChannel, slackChannel } from './services/notifications/channels/slackChannel';
 
 const app = express();
 
@@ -164,6 +166,11 @@ app.use('/api/integrations/slack',        slackIntegrationRoutes);
 // env vars are present. Safe no-op when they're absent.
 if (configureWebPush()) {
   registerChannel(webPushChannel);
+}
+// Sprint D-9 — register the Slack channel if SLACK_* env vars are
+// present. Safe no-op when they're absent (server boot unaffected).
+if (configureSlackChannel()) {
+  registerChannel(slackChannel);
 }
 app.use("/api/profile",       profileRoutes);
 app.use("/api/notifications", notificationRoutes);

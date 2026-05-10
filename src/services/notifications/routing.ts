@@ -28,8 +28,23 @@ export async function selectChannels(event: NotificationEvent): Promise<Notifica
 
   const requested = pickChannelsForSeverity(event.severity, prefs);
 
+  // Sprint D-9 — Slack/Teams use a per-severity opt-in list instead of
+  // riding inside criticalChannels/etc. The toggle is `slackEnabled` on
+  // the prefs row; the inclusion list is `slackChannels`.
+  const result = [...requested];
+  if (prefs?.slackEnabled && Array.isArray((prefs as any).slackChannels)) {
+    if (((prefs as any).slackChannels as string[]).includes(event.severity)) {
+      result.push("slack");
+    }
+  }
+  if (prefs?.teamsEnabled && Array.isArray((prefs as any).teamsChannels)) {
+    if (((prefs as any).teamsChannels as string[]).includes(event.severity)) {
+      result.push("teams");
+    }
+  }
+
   // Apply master per-channel toggles.
-  return requested.filter((ch) => isChannelEnabled(ch, prefs, event.severity));
+  return result.filter((ch) => isChannelEnabled(ch, prefs, event.severity));
 }
 
 function pickChannelsForSeverity(
@@ -56,6 +71,8 @@ function isChannelEnabled(
   if (channel === "email"    && prefs.emailEnabled    === false) return false;
   if (channel === "webpush"  && prefs.webPushEnabled  === false) return false;
   if (channel === "mobilepush" && prefs.mobilePushEnabled === false) return false;
+  if (channel === "slack"    && prefs.slackEnabled    === false) return false;
+  if (channel === "teams"    && prefs.teamsEnabled    === false) return false;
   return true;
 }
 

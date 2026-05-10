@@ -23,6 +23,7 @@ import { authenticate } from "../../middleware/auth";
 import { slackOAuthController } from "../../controllers/integrations/slackOAuthController";
 import { slackCommandsController } from "../../controllers/integrations/slackCommandsController";
 import { slackInteractionsController } from "../../controllers/integrations/slackInteractionsController";
+import { slackChannelMappingController } from "../../controllers/integrations/slackChannelMappingController";
 
 const router = Router();
 
@@ -52,5 +53,12 @@ router.use(authenticate);
 router.get("/",                slackOAuthController.list);
 router.get("/install",         slackOAuthController.install);
 router.post("/uninstall/:id",  slackOAuthController.uninstall);
+
+// Channel mapping CRUD + test-send + preferences (B.6 / B.8 surface).
+router.patch("/preferences",                              slackChannelMappingController.updatePreferences);
+router.get("/:installationId/channels",                   slackChannelMappingController.listChannels);
+router.get("/:installationId/mappings",                   slackChannelMappingController.listMappings);
+router.put("/:installationId/mappings",                   slackChannelMappingController.replaceMappings);
+router.post("/:installationId/test-send",                 slackChannelMappingController.testSend);
 
 export default router;

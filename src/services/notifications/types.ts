@@ -9,7 +9,7 @@ export type NotificationSeverity =
   | "SHARE_EVENT"
   | "SYSTEM";
 
-export type NotificationChannel = "inapp" | "email" | "webpush" | "mobilepush";
+export type NotificationChannel = "inapp" | "email" | "webpush" | "mobilepush" | "slack" | "teams";
 
 export type IconTone = "cyan" | "violet" | "mint" | "amber" | "crimson";
 
