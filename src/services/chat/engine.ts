@@ -35,6 +35,7 @@ import { env } from "../../config/env";
 import { ALL_TOOLS, MUTATING_TOOLS } from "./tools";
 import { dispatchTool, ToolDispatchResult } from "./toolImpls";
 import { trimMemoryToCap, MessageForMemory, sumTokens, estimateTokens } from "./memory";
+import { maybeGenerateTitle } from "./titleGen";
 
 const MAX_TOOL_LOOPS = 5;             // safety: cap function-call re-entrancy per turn
 const STREAM_TIMEOUT_MS = 45_000;     // hard cap per turn
@@ -294,6 +295,15 @@ export async function* streamChat(args: StreamChatArgs): AsyncGenerator<ChatChun
     await prisma.chatConversation.update({
       where: { id: args.conversationId },
       data:  { lastMessageAt: new Date() }
+    });
+
+    // Fire-and-forget title generation. Triggers Gemini at most
+    // once per conversation (titleGen guards against re-runs by
+    // checking the existing title against known defaults).
+    void maybeGenerateTitle({
+      conversationId: args.conversationId,
+      merchantId:     args.merchantId,
+      locale:         args.locale
     });
   } catch (err: any) {
     yield { event: "error", data: { message: `persist_failed: ${err?.message || err}` } };
