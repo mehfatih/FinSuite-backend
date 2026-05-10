@@ -102,6 +102,8 @@ import { sharePageRouter, ogImageRouter, trackRouter } from './routes/publicShar
 import customerChatRoutes from './routes/customer/chat';
 // Sprint D-9 — Slack workspace integration (OAuth + webhooks)
 import slackIntegrationRoutes from './routes/integrations/slack';
+// Sprint D-10 — V2-dashboard rollout flag
+import customerRolloutRoutes from './routes/customer/rollout';
 // Sprint D-4 — register Web Push channel into the notification engine
 import { configureWebPush, webPushChannel } from './services/notifications/channels/webPushChannel';
 import { registerChannel }                  from './services/notifications/engine';
@@ -173,6 +175,8 @@ app.use('/api/customer',           customerCmdkRoutes);
 // express.raw() inside subsequent commits; current file ships only the
 // OAuth flow — server boots cleanly when SLACK_* env vars are absent).
 app.use('/api/integrations/slack',        slackIntegrationRoutes);
+// Sprint D-10 — V2-dashboard rollout flag (auth-required GET)
+app.use('/api/customer/rollout',          customerRolloutRoutes);
 
 // Sprint D-4 — register the Web Push channel into the engine if VAPID
 // env vars are present. Safe no-op when they're absent.
