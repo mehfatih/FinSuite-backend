@@ -80,6 +80,8 @@ import customerWebPushRoutes         from './routes/customer/webPush';
 import resendWebhookRoutes           from './routes/webhooks/resend';
 // Sprint D-5 — public morning-brief unsubscribe (signed-token-gated)
 import morningBriefUnsubscribeRoutes from './routes/morningBriefUnsubscribe';
+// Sprint D-5 — customer-side morning brief CRUD + test send + stats
+import customerMorningBriefRoutes    from './routes/customer/morningBrief';
 // Sprint D-4 — register Web Push channel into the notification engine
 import { configureWebPush, webPushChannel } from './services/notifications/channels/webPushChannel';
 import { registerChannel }                  from './services/notifications/engine';
@@ -126,6 +128,8 @@ app.use('/api/customer/web-push',      customerWebPushRoutes);
 app.use('/api/webhooks',               resendWebhookRoutes);
 // Sprint D-5 — public unsubscribe (signed JWT in token query/body; no auth)
 app.use('/api/morning-brief/unsubscribe', morningBriefUnsubscribeRoutes);
+// Sprint D-5 — authenticated customer subscription CRUD
+app.use('/api/customer/morning-brief',    customerMorningBriefRoutes);
 app.use('/api/customer',           customerCmdkRoutes);
 
 // Sprint D-4 — register the Web Push channel into the engine if VAPID
