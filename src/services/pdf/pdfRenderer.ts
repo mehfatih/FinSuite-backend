@@ -28,7 +28,8 @@ const POOL_SIZE = Math.max(1, Math.min(4, parseInt(process.env.PDF_MAX_BROWSERS 
 const MAX_RENDERS_PER_BROWSER = 50;
 const PAGE_TIMEOUT_MS = 20_000;
 
-interface PooledBrowser {
+/** Sprint D-7: exported so ogImageRenderer can type the slot it holds. */
+export interface PooledBrowser {
   browser:  Browser;
   busy:     boolean;
   renders:  number;
@@ -66,8 +67,12 @@ async function launchBrowser(): Promise<Browser> {
   return browser;
 }
 
-/** Acquire an idle browser, spawning one if pool capacity allows. */
-async function acquireBrowser(): Promise<PooledBrowser> {
+/**
+ * Acquire an idle browser, spawning one if pool capacity allows.
+ * Sprint D-7: exported so services/share/ogImageRenderer.ts can
+ * reuse the same pool for PNG screenshot renders (decision §6.D).
+ */
+export async function acquireBrowser(): Promise<PooledBrowser> {
   // 1) reuse an idle browser
   let slot = pool.find((p) => !p.busy && p.browser.isConnected());
   if (slot) {
@@ -103,7 +108,8 @@ async function acquireBrowser(): Promise<PooledBrowser> {
   throw new Error('PDF renderer: timed out waiting for an idle browser instance.');
 }
 
-function release(slot: PooledBrowser): void {
+/** Sprint D-7: exported alongside acquireBrowser for OG image renderer reuse. */
+export function release(slot: PooledBrowser): void {
   slot.busy = false;
   slot.renders += 1;
 }
