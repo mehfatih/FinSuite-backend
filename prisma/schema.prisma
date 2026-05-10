@@ -431,6 +431,8 @@ model Merchant {
   insightShares          InsightShare[]
   notificationPreference NotificationPreference?
   webPushSubscriptions   WebPushSubscription[]
+  morningBriefSubscription MorningBriefSubscription?
+  morningBriefSends      MorningBriefSend[]
 
   @@map("merchants")
 }
@@ -2080,4 +2082,54 @@ model SystemAlert {
   @@index([severity, isResolved])
   @@index([type, createdAt])
   @@map("system_alerts")
+}
+
+// =====================================================================
+// Sprint D-5 — Daily AI Briefing Email Digest.
+//   MorningBriefSubscription — per-merchant opt-in + schedule + bounce
+//                              counter for the morning email digest.
+//   MorningBriefSend          — immutable send-log row for engagement
+//                              tracking (delivered/opened/clicked/bounced).
+//
+// Naming chosen to avoid collision with the existing `customer_daily_brief`
+// in-app cache table (Phase 16). "Morning" matches the user-facing
+// "Zyrix Morning Brief" subject line.
+// =====================================================================
+model MorningBriefSubscription {
+  id              String    @id @default(cuid())
+  merchantId      String    @unique
+  enabled         Boolean   @default(true)
+  frequency       String    @default("daily")   // 'daily' | 'weekdays' | 'weekly' | 'never'
+  weeklyDay       Int?                           // 0=Sunday..6=Saturday; only used when frequency='weekly'
+  sendHourLocal   Int       @default(7)          // 0-23 in Merchant.timezone
+  lastSentAt      DateTime?
+  bounceCount     Int       @default(0)          // hard bounces; auto-disable at >= 3
+  variant         String    @default("v1")       // A/B variant key (V1 ships only "v1")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  merchant        Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("morning_brief_subscriptions")
+}
+
+model MorningBriefSend {
+  id                  String    @id @default(cuid())
+  merchantId          String
+  variant             String    @default("v1")
+  subject             String
+  insightIds          String[]                    // Insight rows fed into this send
+  providerMessageId   String?                     // Resend message ID — webhook lookup key
+  status              String    @default("sent")  // 'sent' | 'delivered' | 'opened' | 'failed'
+  sentAt              DateTime  @default(now())
+  deliveredAt         DateTime?
+  openedAt            DateTime?
+  clickedAt           DateTime?
+  bouncedAt           DateTime?
+  bounceReason        String?
+  unsubscribeClicked  Boolean   @default(false)
+  merchant            Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId, sentAt])
+  @@index([providerMessageId])
+  @@map("morning_brief_sends")
 }
