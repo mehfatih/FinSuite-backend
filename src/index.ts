@@ -1,3 +1,9 @@
+// Sprint D-10 — Sentry init MUST run before any other module that
+// might throw at import time so unhandled exceptions during boot
+// reach the error tracker. No-op when SENTRY_DSN unset.
+import { initSentry } from "./services/observability/sentry";
+initSentry();
+
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -5,6 +11,7 @@ import { env } from "./config/env";
 import { prisma } from "./config/database";
 import { globalRateLimiter } from "./middleware/rateLimiter";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import { requestId } from "./middleware/requestId";
 
 // v1
 import authRoutes         from "./routes/auth";
@@ -104,6 +111,9 @@ const app = express();
 
 app.use(helmet());
 app.use(cors({ origin: "*", credentials: true }));
+// Sprint D-10 — Stamp requestId BEFORE rate limiter / parsers so every
+// log line + error response carries a correlation id.
+app.use(requestId);
 app.use(globalRateLimiter);
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true }));
