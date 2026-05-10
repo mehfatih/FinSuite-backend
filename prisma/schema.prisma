@@ -2103,6 +2103,7 @@ model MorningBriefSubscription {
   weeklyDay       Int?                           // 0=Sunday..6=Saturday; only used when frequency='weekly'
   sendHourLocal   Int       @default(7)          // 0-23 in Merchant.timezone
   lastSentAt      DateTime?
+  pausedUntil     DateTime?                      // unsubscribe page "pause 30 days"; scheduler skips while in the future
   bounceCount     Int       @default(0)          // hard bounces; auto-disable at >= 3
   variant         String    @default("v1")       // A/B variant key (V1 ships only "v1")
   createdAt       DateTime  @default(now())

@@ -37,6 +37,7 @@ export interface ScheduleSubscription {
   weeklyDay:      number | null;
   sendHourLocal:  number;
   lastSentAt:     Date | null;
+  pausedUntil:    Date | null;
   bounceCount:    number;
   variant:        string;
 }
@@ -69,7 +70,7 @@ export interface TickResult {
  * Pure function — exported for testability.
  */
 export function shouldSendNow(args: {
-  sub:       Pick<ScheduleSubscription, "frequency" | "weeklyDay" | "sendHourLocal" | "lastSentAt" | "enabled">;
+  sub:       Pick<ScheduleSubscription, "frequency" | "weeklyDay" | "sendHourLocal" | "lastSentAt" | "enabled" | "pausedUntil">;
   localHour: number;
   localDow:  number;     // 0=Sunday..6=Saturday
   nowMs:     number;
@@ -77,6 +78,9 @@ export function shouldSendNow(args: {
   const { sub, localHour, localDow, nowMs } = args;
 
   if (!sub.enabled)                         return { fire: false, reason: "disabled" };
+  if (sub.pausedUntil && sub.pausedUntil.getTime() > nowMs) {
+    return { fire: false, reason: "paused" };
+  }
   if (sub.frequency === "never")            return { fire: false, reason: "frequency=never" };
   if (sub.sendHourLocal !== localHour)      return { fire: false, reason: `local_hour_mismatch (${localHour}!=${sub.sendHourLocal})` };
 
@@ -113,6 +117,7 @@ export async function findEnabledSubscriptions(): Promise<Array<{ sub: ScheduleS
       id: r.id, merchantId: r.merchantId, enabled: r.enabled,
       frequency: r.frequency, weeklyDay: r.weeklyDay,
       sendHourLocal: r.sendHourLocal, lastSentAt: r.lastSentAt,
+      pausedUntil: r.pausedUntil,
       bounceCount: r.bounceCount, variant: r.variant
     },
     merchant: {

@@ -78,6 +78,8 @@ import customerPreferencesRoutes     from './routes/customer/preferences';
 import customerWebPushRoutes         from './routes/customer/webPush';
 // Sprint D-4 — Resend email webhook (deliveredAt / openedAt for D-3 shares)
 import resendWebhookRoutes           from './routes/webhooks/resend';
+// Sprint D-5 — public morning-brief unsubscribe (signed-token-gated)
+import morningBriefUnsubscribeRoutes from './routes/morningBriefUnsubscribe';
 // Sprint D-4 — register Web Push channel into the notification engine
 import { configureWebPush, webPushChannel } from './services/notifications/channels/webPushChannel';
 import { registerChannel }                  from './services/notifications/engine';
@@ -122,6 +124,8 @@ app.use('/api/customer/preferences',   customerPreferencesRoutes);
 app.use('/api/customer/web-push',      customerWebPushRoutes);
 // Sprint D-4 — public Resend webhook (HMAC-verified inside; no auth)
 app.use('/api/webhooks',               resendWebhookRoutes);
+// Sprint D-5 — public unsubscribe (signed JWT in token query/body; no auth)
+app.use('/api/morning-brief/unsubscribe', morningBriefUnsubscribeRoutes);
 app.use('/api/customer',           customerCmdkRoutes);
 
 // Sprint D-4 — register the Web Push channel into the engine if VAPID
