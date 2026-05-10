@@ -436,6 +436,7 @@ model Merchant {
   weeklyReports          WeeklyReport[]
   weeklyReportSubscription WeeklyReportSubscription?
   weeklyReportSends      WeeklyReportSend[]
+  publicShareLinks       PublicShareLink[]
 
   @@map("merchants")
 }
@@ -2208,4 +2209,83 @@ model WeeklyReportSend {
   @@index([merchantId, sentAt])
   @@index([providerMessageId])
   @@map("weekly_report_sends")
+}
+
+// =====================================================================
+// Sprint D-7 — Public Share Links (anyone-with-link, no auth required).
+//
+//   PublicShareLink — 8-char nanoid slug, points at an existing
+//                     Insight / DailyBrief / WeeklyReport. Privacy
+//                     mode controls how content is rendered. Optional
+//                     password gate, expiry, comment toggle, robots
+//                     opt-in. Independent of D-3's InsightShare table
+//                     (which is recipient-specific JWT-signed).
+//   ShareComment    — public commenter (name + optional email + IP
+//                     hash). 1-level deep replies (parentId nullable;
+//                     enforced server-side: no nested-nested replies).
+//   ShareView       — view tracking with hashed IP for unique counts
+//                     and basic geo (country header from CDN).
+//
+// All FKs use merchantId per the hard rule.
+// =====================================================================
+model PublicShareLink {
+  id            String          @id @default(cuid())
+  slug          String          @unique
+  merchantId    String
+  resourceType  String                                      // 'insight' | 'daily_brief' | 'weekly_report'
+  resourceId    String
+  privacyMode   String          @default("full")            // 'full' | 'masked' | 'narrative_only' | 'anonymous'
+  expiresAt     DateTime?
+  permanent     Boolean         @default(false)
+  passwordHash  String?                                     // bcrypt; nullable
+  allowComments Boolean         @default(true)
+  requireEmail  Boolean         @default(false)
+  discoverable  Boolean         @default(false)             // robots.txt opt-in (default noindex)
+  viewCount     Int             @default(0)
+  commentCount  Int             @default(0)
+  lastViewedAt  DateTime?
+  revoked       Boolean         @default(false)
+  revokedAt     DateTime?
+  createdAt     DateTime        @default(now())
+  createdBy     String                                      // merchantId (no sub-user model)
+  merchant      Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  comments      ShareComment[]
+  views         ShareView[]
+
+  @@index([slug])
+  @@index([merchantId, createdAt])
+  @@map("public_share_links")
+}
+
+model ShareComment {
+  id           String          @id @default(cuid())
+  shareLinkId  String
+  parentId     String?                                       // 1-level-deep reply target
+  authorName   String
+  authorEmail  String?
+  body         String          @db.Text
+  ipHash       String                                       // sha256(ip + per-day salt) for rate-limit + dedup
+  hidden       Boolean         @default(false)
+  hiddenReason String?
+  createdAt    DateTime        @default(now())
+  shareLink    PublicShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  parent       ShareComment?   @relation("ShareCommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies      ShareComment[]  @relation("ShareCommentReplies")
+
+  @@index([shareLinkId, createdAt])
+  @@map("share_comments")
+}
+
+model ShareView {
+  id           String          @id @default(cuid())
+  shareLinkId  String
+  ipHash       String
+  userAgent    String?
+  referer      String?
+  country      String?
+  viewedAt     DateTime        @default(now())
+  shareLink    PublicShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+
+  @@index([shareLinkId, viewedAt])
+  @@map("share_views")
 }
