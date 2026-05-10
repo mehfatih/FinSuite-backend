@@ -43,7 +43,10 @@ const LAUNCH_ARGS = [
   '--disable-gpu',
   '--no-first-run',
   '--no-zygote',
-  '--single-process',            // one renderer process — saves memory
+  // Removed `--single-process` (Sprint D-2.5 B.5): caused "Navigating
+  // frame was detached" mid-render on the insight print-theme.
+  // Multi-process is Chromium's default and stable; the small memory
+  // increase is acceptable at our render volume.
   '--disable-extensions',
   '--disable-background-networking',
   '--disable-default-apps',
