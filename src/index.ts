@@ -86,6 +86,8 @@ import weeklyReportUnsubscribeRoutes from './routes/weeklyReportUnsubscribe';
 import customerMorningBriefRoutes    from './routes/customer/morningBrief';
 // Sprint D-6 — customer-side weekly report CRUD + viewer + subscription
 import customerWeeklyReportRoutes    from './routes/customer/weeklyReport';
+// Sprint D-7 — customer-side public share link CRUD
+import customerPublicShareLinksRoutes from './routes/customer/publicShareLinks';
 // Sprint D-4 — register Web Push channel into the notification engine
 import { configureWebPush, webPushChannel } from './services/notifications/channels/webPushChannel';
 import { registerChannel }                  from './services/notifications/engine';
@@ -138,6 +140,8 @@ app.use('/api/weekly-report/unsubscribe', weeklyReportUnsubscribeRoutes);
 app.use('/api/customer/morning-brief',    customerMorningBriefRoutes);
 // Sprint D-6 — authenticated customer weekly-report endpoints
 app.use('/api/customer/weekly-report',    customerWeeklyReportRoutes);
+// Sprint D-7 — authenticated customer public-share-link CRUD
+app.use('/api/customer/share-links',      customerPublicShareLinksRoutes);
 app.use('/api/customer',           customerCmdkRoutes);
 
 // Sprint D-4 — register the Web Push channel into the engine if VAPID
