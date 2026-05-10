@@ -116,6 +116,11 @@ export const resendWebhookController = {
       const briefSend = share ? null : await prisma.morningBriefSend.findFirst({
         where: { providerMessageId: emailId }
       });
+      // Sprint D-6 — third-table fall-through for the weekly report
+      // send log (same uniqueness reasoning as D-5).
+      const weeklySend = (share || briefSend) ? null : await prisma.weeklyReportSend.findFirst({
+        where: { providerMessageId: emailId }
+      });
 
       if (eventType === "email.delivered") {
         if (share && !share.deliveredAt) {
@@ -133,6 +138,11 @@ export const resendWebhookController = {
           await prisma.morningBriefSend.update({
             where: { id: briefSend.id },
             data:  { deliveredAt: new Date(), status: briefSend.status === "sent" ? "delivered" : briefSend.status }
+          });
+        } else if (weeklySend && !weeklySend.deliveredAt) {
+          await prisma.weeklyReportSend.update({
+            where: { id: weeklySend.id },
+            data:  { deliveredAt: new Date(), status: weeklySend.status === "sent" ? "delivered" : weeklySend.status }
           });
         }
         res.status(200).json({ success: true, handled: "email.delivered" });
@@ -156,18 +166,28 @@ export const resendWebhookController = {
             where: { id: briefSend.id },
             data:  { openedAt: new Date(), status: "opened" }
           });
+        } else if (weeklySend && !weeklySend.openedAt) {
+          await prisma.weeklyReportSend.update({
+            where: { id: weeklySend.id },
+            data:  { openedAt: new Date(), status: "opened" }
+          });
         }
         res.status(200).json({ success: true, handled: "email.opened" });
         return;
       }
 
-      // Sprint D-5 — clicked is a morning-brief-only signal (D-3 share
-      // emails don't track clicks since the action happens via the PDF
-      // attachment, not an in-email link).
+      // Sprint D-5/D-6 — clicked is tracked for morning brief and
+      // weekly report emails (both have an in-email "Open" CTA);
+      // D-3 share emails don't fire this event.
       if (eventType === "email.clicked") {
         if (briefSend && !briefSend.clickedAt) {
           await prisma.morningBriefSend.update({
             where: { id: briefSend.id },
+            data:  { clickedAt: new Date() }
+          });
+        } else if (weeklySend && !weeklySend.clickedAt) {
+          await prisma.weeklyReportSend.update({
+            where: { id: weeklySend.id },
             data:  { clickedAt: new Date() }
           });
         }
@@ -189,6 +209,13 @@ export const resendWebhookController = {
           });
           // Sprint D-5 hard rule: 3 hard bounces -> auto-disable + admin notif.
           await handleMorningBriefBounce(briefSend.merchantId, reason);
+        } else if (weeklySend) {
+          await prisma.weeklyReportSend.update({
+            where: { id: weeklySend.id },
+            data:  { status: "failed", bouncedAt: new Date(), bounceReason: reason }
+          });
+          // Sprint D-6 same rule: 3 hard bounces -> auto-disable + admin notif.
+          await handleWeeklyReportBounce(weeklySend.merchantId, reason);
         }
         res.status(200).json({ success: true, handled: eventType });
         return;
@@ -237,5 +264,40 @@ async function handleMorningBriefBounce(merchantId: string, reason: string): Pro
     }
   } catch (err: any) {
     console.error("[webhooks/resend] handleMorningBriefBounce failed:", err?.message || err);
+  }
+}
+
+// Sprint D-6 — same rule for weekly report subscriptions.
+async function handleWeeklyReportBounce(merchantId: string, reason: string): Promise<void> {
+  try {
+    const sub = await prisma.weeklyReportSubscription.findUnique({
+      where: { merchantId }
+    });
+    if (!sub) return;
+
+    const next = sub.bounceCount + 1;
+    const shouldDisable = next >= 3 && sub.enabled;
+    await prisma.weeklyReportSubscription.update({
+      where: { merchantId },
+      data:  shouldDisable
+        ? { bounceCount: next, enabled: false }
+        : { bounceCount: next }
+    });
+
+    if (shouldDisable) {
+      await prisma.adminNotification.create({
+        data: {
+          type:     "weekly-report-bounce",
+          severity: "warning",
+          title:    "Weekly report auto-disabled (3 bounces)",
+          message:  `Merchant ${merchantId} hit 3 hard bounces; weekly report disabled. Reason: ${reason}`,
+          link:     `/admin/email-engagement?merchantId=${encodeURIComponent(merchantId)}`
+        }
+      }).catch((err) =>
+        console.error("[webhooks/resend] AdminNotification create failed:", err?.message || err)
+      );
+    }
+  } catch (err: any) {
+    console.error("[webhooks/resend] handleWeeklyReportBounce failed:", err?.message || err);
   }
 }
