@@ -22,6 +22,7 @@ import express from "express";
 import { authenticate } from "../../middleware/auth";
 import { slackOAuthController } from "../../controllers/integrations/slackOAuthController";
 import { slackCommandsController } from "../../controllers/integrations/slackCommandsController";
+import { slackInteractionsController } from "../../controllers/integrations/slackInteractionsController";
 
 const router = Router();
 
@@ -31,11 +32,18 @@ router.get("/oauth-callback", slackOAuthController.callback);
 // ─── Public webhook routes (Slack signing-secret HMAC IS the credential) ─
 // MUST mount express.raw() per route — express.json() upstream would have
 // already consumed the body and the HMAC would never match. Limit guards
-// against pathological payloads (Slack's max command body is ~30 KB).
+// against pathological payloads (Slack's max body is ~30 KB for commands,
+// ~100 KB for some interaction payloads with large views).
 router.post(
   "/commands",
   express.raw({ type: "application/x-www-form-urlencoded", limit: "100kb" }),
   slackCommandsController.handle
+);
+
+router.post(
+  "/interactions",
+  express.raw({ type: "application/x-www-form-urlencoded", limit: "200kb" }),
+  slackInteractionsController.handle
 );
 
 // ─── Auth-required endpoints ─────────────────────────────────
