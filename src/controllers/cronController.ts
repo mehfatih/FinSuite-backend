@@ -5,6 +5,7 @@
 import { Request, Response, RequestHandler } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { Resend } from 'resend';
+import { runMorningBriefTick } from '../services/morningBrief/scheduler';
 
 const prisma = new PrismaClient();
 const resend  = new Resend(process.env.RESEND_API_KEY);
@@ -341,6 +342,26 @@ export const processRecurringInvoices = h(async (req: Request, res: Response) =>
 
     res.json({ success: true, data: { processed, total: due.length } });
   } catch (err) {
+    res.status(500).json({ success: false, error: 'Cron job failed' });
+  }
+});
+
+// ── Sprint D-5 — Morning Brief Tick ───────────────────────────
+// POST /api/cron/morning-brief-tick
+// Triggered every 15 min by Railway cron with the x-cron-secret header.
+// Idempotent: the 23-hour double-fire guard inside scheduler.ts
+// prevents re-firing the same merchant on the next tick that still
+// falls inside the same local hour.
+export const runMorningBrief = h(async (req: Request, res: Response) => {
+  const secret = req.headers['x-cron-secret'];
+  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const result = await runMorningBriefTick();
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    console.error('[Cron] morning-brief-tick error:', err?.message || err);
     res.status(500).json({ success: false, error: 'Cron job failed' });
   }
 });
