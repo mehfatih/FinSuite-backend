@@ -2,6 +2,7 @@ import { Response, RequestHandler } from "express";
 import { pid } from "../utils/params";
 import { prisma } from "../config/database";
 import { AuthenticatedRequest } from "../types";
+import { resolveProfile } from "../services/regulatory/profileResolver";
 
 const h = (fn: Function): RequestHandler => fn as RequestHandler;
 
@@ -58,17 +59,30 @@ export const invoiceController = {
       const count = await prisma.invoice.count({ where: { merchantId } });
       const invoiceNumber = `INV-${new Date().getFullYear()}-${String(count + 1).padStart(4, "0")}`;
 
+      // Sprint D-11 — resolve the merchant's regulatory profile at
+      // issue time (today) so vatRate + currency default to the active
+      // country-specific values when the caller doesn't supply them.
+      // Explicit caller-supplied values still win (a TR merchant can
+      // pick KDV 1% / 10% from the additionalRates list per invoice).
+      // Existing pre-D-11 invoices already carry their own vatRate +
+      // currency on the row, so backwards-compat is intact.
+      const issueDate = new Date();
+      const profile   = await resolveProfile({ merchantId, asOf: issueDate });
+
       const subtotal = (items as any[]).reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0);
-      const vat = parseFloat(vatRate || "20");
+      const vat = vatRate !== undefined && vatRate !== null && vatRate !== ""
+        ? parseFloat(vatRate)
+        : profile.activeRate;
       const vatAmount = subtotal * (vat / 100);
       const total = subtotal + vatAmount;
+      const resolvedCurrency = currency || profile.currency;
 
       const invoice = await prisma.invoice.create({
         data: {
           merchantId, invoiceNumber, customerName,
           customerEmail, customerPhone, customerTaxId,
           items, subtotal, vatRate: vat, vatAmount, total,
-          currency: currency || "TRY",
+          currency: resolvedCurrency,
           dueDate: new Date(dueDate), notes,
         }
       });
