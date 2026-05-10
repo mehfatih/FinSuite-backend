@@ -90,6 +90,8 @@ import customerWeeklyReportRoutes    from './routes/customer/weeklyReport';
 import customerPublicShareLinksRoutes from './routes/customer/publicShareLinks';
 // Sprint D-7 — public HTML / OG image / view-tracking endpoints
 import { sharePageRouter, ogImageRouter, trackRouter } from './routes/publicShareLink';
+// Sprint D-8 — AI chat (auth-required CRUD + actions; SSE stream uses ?token=)
+import customerChatRoutes from './routes/customer/chat';
 // Sprint D-4 — register Web Push channel into the notification engine
 import { configureWebPush, webPushChannel } from './services/notifications/channels/webPushChannel';
 import { registerChannel }                  from './services/notifications/engine';
@@ -148,6 +150,8 @@ app.use('/api/customer/share-links',      customerPublicShareLinksRoutes);
 app.use('/share',                          sharePageRouter);
 app.use('/og',                             ogImageRouter);
 app.use('/api/public',                     trackRouter);
+// Sprint D-8 — AI chat (auth-required POST + token-gated SSE GET)
+app.use('/api/customer/chat',             customerChatRoutes);
 app.use('/api/customer',           customerCmdkRoutes);
 
 // Sprint D-4 — register the Web Push channel into the engine if VAPID
