@@ -12,6 +12,7 @@ import { prisma } from "./config/database";
 import { globalRateLimiter } from "./middleware/rateLimiter";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { requestId } from "./middleware/requestId";
+import { healthController } from "./controllers/healthController";
 
 // v1
 import authRoutes         from "./routes/auth";
@@ -118,9 +119,10 @@ app.use(globalRateLimiter);
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true }));
 
-app.get("/health", (_req, res) => {
-  res.status(200).json({ success: true, data: { status: "ok", service: "zyrix-finsuite-backend", version: "3.0.0", environment: env.nodeEnv, timestamp: new Date().toISOString() } });
-});
+// Sprint D-10 — Soft probe with per-dependency status (always 200);
+// strict readiness probe (503 when DB is down).
+app.get("/health",       healthController.full);
+app.get("/health/ready", healthController.ready);
 
 // v1
 app.use("/api/auth",          authRoutes);
