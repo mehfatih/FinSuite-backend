@@ -227,11 +227,31 @@ export async function askCfo(
   // Build live financial context
   const ctx = await buildFinancialContext(merchantId);
 
+  // Sprint D-11 — country-aware persona prefix layered on top of the
+  // existing SYSTEM_PROMPT. Lazy-imported to avoid pulling the
+  // regulatory module at file-load time. Best-effort: chat works even
+  // if persona resolution fails.
+  let sysPrompt = SYSTEM_PROMPT;
+  try {
+    const { resolveProfile } = await import("./regulatory/profileResolver");
+    const { buildPersonaPrefix } = await import("./chat/persona");
+    const profile = await resolveProfile({ merchantId });
+    const country = profile.country === "OTHER" ? "OTHER" : profile.country;
+    // CFO voice service detects locale from the user's message rather
+    // than a fixed input — pass 'en' here so the prefix is locale-
+    // neutral; the existing SYSTEM_PROMPT's "detect and respond in
+    // user's language" rule is unaffected.
+    const prefix = buildPersonaPrefix(country, "en");
+    if (prefix) sysPrompt = prefix + SYSTEM_PROMPT;
+  } catch (err: any) {
+    console.warn("[aiCfoVoice] persona prefix failed, using base prompt:", err?.message || err);
+  }
+
   // Compose the conversation
   const genAI = new GoogleGenerativeAI(env.geminiApiKey);
   const model = genAI.getGenerativeModel({
     model: "gemini-1.5-flash",
-    systemInstruction: SYSTEM_PROMPT,
+    systemInstruction: sysPrompt,
     generationConfig: {
       temperature: 0.3,
       maxOutputTokens: 1024,

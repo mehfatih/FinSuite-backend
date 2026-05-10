@@ -73,6 +73,26 @@ function systemPrompt(locale: "tr" | "en" | "ar"): string {
   return SYS[locale] || SYS.tr;
 }
 
+// Sprint D-11 — Country-aware persona prefix prepended to the system
+// prompt at runtime. Layered ON TOP of the existing prompt; the
+// SYS[locale] strings stay byte-for-byte unchanged.
+async function buildSystemPromptForMerchant(merchantId: string, locale: "tr" | "en" | "ar"): Promise<string> {
+  const base = systemPrompt(locale);
+  try {
+    const { resolveProfile } = await import("../regulatory/profileResolver");
+    const { buildPersonaPrefix } = await import("./persona");
+    const profile = await resolveProfile({ merchantId });
+    const country = profile.country === "OTHER" ? "OTHER" : profile.country;
+    const prefix = buildPersonaPrefix(country, locale);
+    return prefix + base;
+  } catch (err: any) {
+    // Persona resolution is best-effort — chat must still work when
+    // the resolver fails (unknown merchantId, DB hiccup, etc.).
+    console.warn("[chat/engine] persona prefix failed, using base prompt:", err?.message || err);
+    return base;
+  }
+}
+
 // ─── History → Gemini contents shape ────────────────────────
 
 function loadGeminiHistory(messages: MessageForMemory[]): Content[] {
@@ -124,10 +144,12 @@ export async function* streamChat(args: StreamChatArgs): AsyncGenerator<ChatChun
   // 2. Trim to soft cap.
   const trimmed = trimMemoryToCap(priorMessages);
 
-  // 3. Build Gemini config + history.
+  // 3. Build Gemini config + history. Sprint D-11 — country-aware
+  // persona prefix layered on top of the existing locale prompt.
+  const sysPrompt = await buildSystemPromptForMerchant(args.merchantId, args.locale);
   const model = genAI.getGenerativeModel({
     model:             "gemini-2.0-flash",
-    systemInstruction: systemPrompt(args.locale),
+    systemInstruction: sysPrompt,
     tools:             [{ functionDeclarations: ALL_TOOLS }]
   });
   let contents: Content[] = loadGeminiHistory(trimmed);
