@@ -10,6 +10,7 @@
 import { Router } from "express";
 import { authenticate } from "../../middleware/auth";
 import { chatStreamController } from "../../controllers/customer/chatStreamController";
+import { chatConversationsController } from "../../controllers/customer/chatConversationsController";
 
 const router = Router();
 
@@ -22,5 +23,12 @@ router.get("/stream", chatStreamController.stream);
 router.use(authenticate);
 
 router.post("/messages", chatStreamController.postMessage);
+
+router.get   ("/conversations",                chatConversationsController.list);
+router.post  ("/conversations",                chatConversationsController.create);
+router.get   ("/conversations/:id",            chatConversationsController.getById);
+router.patch ("/conversations/:id",            chatConversationsController.update);
+router.delete("/conversations/:id",            chatConversationsController.remove);
+router.get   ("/conversations/:id/messages",   chatConversationsController.listMessages);
 
 export default router;
