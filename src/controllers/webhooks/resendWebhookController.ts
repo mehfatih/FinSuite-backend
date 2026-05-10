@@ -109,6 +109,13 @@ export const resendWebhookController = {
       const share = await prisma.insightShare.findFirst({
         where: { providerMessageId: emailId }
       });
+      // Sprint D-5 — fall through to morning-brief lookup when the
+      // message ID didn't belong to an InsightShare. Resend message
+      // IDs are globally unique, so cross-table collision is not a
+      // concern (decision §6.5.2 option α).
+      const briefSend = share ? null : await prisma.morningBriefSend.findFirst({
+        where: { providerMessageId: emailId }
+      });
 
       if (eventType === "email.delivered") {
         if (share && !share.deliveredAt) {
@@ -121,6 +128,11 @@ export const resendWebhookController = {
             shareId: share.id,
             merchantId: share.merchantId,
             channel: (share.channel as "email" | "whatsapp")
+          });
+        } else if (briefSend && !briefSend.deliveredAt) {
+          await prisma.morningBriefSend.update({
+            where: { id: briefSend.id },
+            data:  { deliveredAt: new Date(), status: briefSend.status === "sent" ? "delivered" : briefSend.status }
           });
         }
         res.status(200).json({ success: true, handled: "email.delivered" });
@@ -139,17 +151,44 @@ export const resendWebhookController = {
             merchantId: share.merchantId,
             channel: (share.channel as "email" | "whatsapp")
           });
+        } else if (briefSend && !briefSend.openedAt) {
+          await prisma.morningBriefSend.update({
+            where: { id: briefSend.id },
+            data:  { openedAt: new Date(), status: "opened" }
+          });
         }
         res.status(200).json({ success: true, handled: "email.opened" });
         return;
       }
 
+      // Sprint D-5 — clicked is a morning-brief-only signal (D-3 share
+      // emails don't track clicks since the action happens via the PDF
+      // attachment, not an in-email link).
+      if (eventType === "email.clicked") {
+        if (briefSend && !briefSend.clickedAt) {
+          await prisma.morningBriefSend.update({
+            where: { id: briefSend.id },
+            data:  { clickedAt: new Date() }
+          });
+        }
+        res.status(200).json({ success: true, handled: "email.clicked" });
+        return;
+      }
+
       if (eventType === "email.bounced" || eventType === "email.complained") {
+        const reason = `${eventType}: ${data?.bounce_type || data?.feedback_type || "unknown"}`;
         if (share) {
           await prisma.insightShare.update({
             where: { id: share.id },
-            data:  { status: "failed", errorMessage: `${eventType}: ${data?.bounce_type || data?.feedback_type || "unknown"}` }
+            data:  { status: "failed", errorMessage: reason }
           });
+        } else if (briefSend) {
+          await prisma.morningBriefSend.update({
+            where: { id: briefSend.id },
+            data:  { status: "failed", bouncedAt: new Date(), bounceReason: reason }
+          });
+          // Sprint D-5 hard rule: 3 hard bounces -> auto-disable + admin notif.
+          await handleMorningBriefBounce(briefSend.merchantId, reason);
         }
         res.status(200).json({ success: true, handled: eventType });
         return;
@@ -163,3 +202,40 @@ export const resendWebhookController = {
     }
   })
 };
+
+// Sprint D-5 — hard-bounce auto-disable for morning brief subscriptions.
+// Best-effort: any DB failure is logged but does not break the webhook
+// response (Resend would otherwise retry indefinitely).
+async function handleMorningBriefBounce(merchantId: string, reason: string): Promise<void> {
+  try {
+    const sub = await prisma.morningBriefSubscription.findUnique({
+      where: { merchantId }
+    });
+    if (!sub) return;
+
+    const next = sub.bounceCount + 1;
+    const shouldDisable = next >= 3 && sub.enabled;
+    await prisma.morningBriefSubscription.update({
+      where: { merchantId },
+      data:  shouldDisable
+        ? { bounceCount: next, enabled: false }
+        : { bounceCount: next }
+    });
+
+    if (shouldDisable) {
+      await prisma.adminNotification.create({
+        data: {
+          type:     "morning-brief-bounce",
+          severity: "warning",
+          title:    "Morning brief auto-disabled (3 bounces)",
+          message:  `Merchant ${merchantId} hit 3 hard bounces; daily digest disabled. Reason: ${reason}`,
+          link:     `/admin/email-engagement?merchantId=${encodeURIComponent(merchantId)}`
+        }
+      }).catch((err) =>
+        console.error("[webhooks/resend] AdminNotification create failed:", err?.message || err)
+      );
+    }
+  } catch (err: any) {
+    console.error("[webhooks/resend] handleMorningBriefBounce failed:", err?.message || err);
+  }
+}
