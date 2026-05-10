@@ -433,6 +433,9 @@ model Merchant {
   webPushSubscriptions   WebPushSubscription[]
   morningBriefSubscription MorningBriefSubscription?
   morningBriefSends      MorningBriefSend[]
+  weeklyReports          WeeklyReport[]
+  weeklyReportSubscription WeeklyReportSubscription?
+  weeklyReportSends      WeeklyReportSend[]
 
   @@map("merchants")
 }
@@ -2133,4 +2136,76 @@ model MorningBriefSend {
   @@index([merchantId, sentAt])
   @@index([providerMessageId])
   @@map("morning_brief_sends")
+}
+
+// =====================================================================
+// Sprint D-6 — Weekly Performance Report (auto-PDF, Sun 18:00 local).
+//
+//   WeeklyReport              — one row per merchant per ISO-week. Holds
+//                               narrative, KPI snapshot, and the insight
+//                               IDs that fed the report. PDF is rendered
+//                               on demand from these inputs (decision
+//                               §6.B option B1 — no blob storage in V1).
+//   WeeklyReportSubscription  — per-merchant opt-in + day/hour schedule
+//                               + bounce counter; mirrors D-5's
+//                               MorningBriefSubscription shape.
+//   WeeklyReportSend          — immutable send-log row for engagement
+//                               tracking (delivered/opened/clicked/
+//                               bounced); webhook-updated.
+// =====================================================================
+model WeeklyReport {
+  id          String   @id @default(cuid())
+  merchantId  String
+  weekStart   DateTime @db.Date    // Monday 00:00 in merchant's local tz, stored as Date
+  weekEnd     DateTime @db.Date    // Sunday 23:59 in merchant's local tz, stored as Date
+  narrative   String   @db.Text
+  insightIds  String[] @default([])
+  kpiSnapshot Json                 // { mrr, mrrDelta, netCash, netCashDelta, margin, marginDelta, runway, runwayDelta, ... }
+  language    String   @default("tr")
+  status      String   @default("ready")   // 'ready' | 'failed'
+  generatedAt DateTime @default(now())
+  merchant    Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  sends       WeeklyReportSend[]
+
+  @@unique([merchantId, weekStart])
+  @@index([merchantId, weekStart])
+  @@map("weekly_reports")
+}
+
+model WeeklyReportSubscription {
+  id            String    @id @default(cuid())
+  merchantId    String    @unique
+  enabled       Boolean   @default(true)
+  sendDayLocal  Int       @default(0)        // 0=Sunday..6=Saturday (matches Date.getDay())
+  sendHourLocal Int       @default(18)       // 0-23 in Merchant.timezone
+  lastSentAt    DateTime?
+  pausedUntil   DateTime?                    // unsubscribe-page "pause 30 days" support
+  bounceCount   Int       @default(0)        // hard bounces; auto-disable at >= 3
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  merchant      Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("weekly_report_subscriptions")
+}
+
+model WeeklyReportSend {
+  id                  String       @id @default(cuid())
+  merchantId          String
+  reportId            String
+  subject             String
+  providerMessageId   String?
+  status              String       @default("sent")  // 'sent' | 'delivered' | 'opened' | 'failed'
+  sentAt              DateTime     @default(now())
+  deliveredAt         DateTime?
+  openedAt            DateTime?
+  clickedAt           DateTime?
+  bouncedAt           DateTime?
+  bounceReason        String?
+  unsubscribeClicked  Boolean      @default(false)
+  merchant            Merchant     @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  report              WeeklyReport @relation(fields: [reportId],   references: [id], onDelete: Cascade)
+
+  @@index([merchantId, sentAt])
+  @@index([providerMessageId])
+  @@map("weekly_report_sends")
 }
