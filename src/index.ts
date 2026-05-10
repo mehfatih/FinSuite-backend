@@ -88,6 +88,8 @@ import customerMorningBriefRoutes    from './routes/customer/morningBrief';
 import customerWeeklyReportRoutes    from './routes/customer/weeklyReport';
 // Sprint D-7 — customer-side public share link CRUD
 import customerPublicShareLinksRoutes from './routes/customer/publicShareLinks';
+// Sprint D-7 — public HTML / OG image / view-tracking endpoints
+import { sharePageRouter, ogImageRouter, trackRouter } from './routes/publicShareLink';
 // Sprint D-4 — register Web Push channel into the notification engine
 import { configureWebPush, webPushChannel } from './services/notifications/channels/webPushChannel';
 import { registerChannel }                  from './services/notifications/engine';
@@ -142,6 +144,10 @@ app.use('/api/customer/morning-brief',    customerMorningBriefRoutes);
 app.use('/api/customer/weekly-report',    customerWeeklyReportRoutes);
 // Sprint D-7 — authenticated customer public-share-link CRUD
 app.use('/api/customer/share-links',      customerPublicShareLinksRoutes);
+// Sprint D-7 — public, no-auth share endpoints (slug IS the credential)
+app.use('/share',                          sharePageRouter);
+app.use('/og',                             ogImageRouter);
+app.use('/api/public',                     trackRouter);
 app.use('/api/customer',           customerCmdkRoutes);
 
 // Sprint D-4 — register the Web Push channel into the engine if VAPID
