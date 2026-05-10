@@ -463,6 +463,11 @@ model Invoice {
   notes          String?
   whatsappSentAt DateTime?
   whatsappStatus String?
+  // Sprint D-11 — ZATCA Phase 2 fields (SA only; nullable so non-SA
+  // invoices don't carry them and pre-D-11 SA invoices keep working).
+  zatcaQrTlv         String?   @db.Text                        // base64 TLV blob (5-tag QR payload)
+  zatcaInvoiceHash   String?                                   // Phase 2 hash chain pointer (placeholder until live signing)
+  zatcaIsSimplified  Boolean?  @default(false)                 // true for B2C ≤1000 SAR
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   merchant       Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
@@ -2431,4 +2436,36 @@ model SlackOutboundLog {
   @@index([installationId, postedAt])
   @@index([insightId])
   @@map("slack_outbound_logs")
+}
+
+// =====================================================================
+// Sprint D-11 — Effective-dated tax rate history.
+//
+// Per discovery decision §10.C: profileResolver picks the active row
+// at invoice creation time. Single concurrent rate per (country,
+// taxName) is enforced by partial-overlap-exclusion at the application
+// layer (admin UI in B.13 won't let you save an overlap).
+//
+// Existing Invoice.vatRate column is preserved as the historical
+// snapshot — the version table feeds NEW invoices, not retroactive
+// recomputation. Old TR invoices stay at their stamped rate (18% / 20%);
+// old SA invoices stay at 15%.
+//
+// `country` is a string (matches Merchant.country) so adding GCC/MENA
+// neighbors doesn't require an enum migration.
+// =====================================================================
+model TaxRateVersion {
+  id              String    @id @default(cuid())
+  country         String                                       // 'TR' | 'SA' | …
+  taxName         String                                       // 'KDV' | 'VAT' | …
+  rate            Decimal   @db.Decimal(5, 2)                  // 20.00 / 15.00 / 18.00
+  effectiveFrom   DateTime                                     // inclusive
+  effectiveTo     DateTime?                                    // exclusive; null = open-ended
+  createdBy       String                                       // admin id from JWT (auditable)
+  notes           String?                                      // optional admin note
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([country, taxName, effectiveFrom])
+  @@map("tax_rate_versions")
 }
