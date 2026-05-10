@@ -386,3 +386,30 @@ export const runWeeklyReport = h(async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: 'Cron job failed' });
   }
 });
+
+// ── Sprint D-8 — Chat Cleanup ────────────────────────────────
+// POST /api/cron/chat-cleanup
+// Triggered nightly by cron-job.org with the x-cron-secret header.
+// Hard-deletes ChatConversation rows whose expiresAt < now()
+// (cascade drops their chat_messages). Per decision §7.I, this
+// implements the spec's 90-day retention default. Conversations
+// with retentionDays=0 (forever) have null expiresAt and are
+// never touched.
+export const runChatCleanup = h(async (req: Request, res: Response) => {
+  const secret = req.headers['x-cron-secret'];
+  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const now = new Date();
+    const result = await prisma.chatConversation.deleteMany({
+      where: {
+        expiresAt: { not: null, lte: now }
+      }
+    });
+    res.json({ success: true, data: { deleted: result.count, scannedAt: now.toISOString() } });
+  } catch (err: any) {
+    console.error('[Cron] chat-cleanup error:', err?.message || err);
+    res.status(500).json({ success: false, error: 'Cron job failed' });
+  }
+});

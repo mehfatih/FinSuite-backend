@@ -11,6 +11,7 @@ import { Router } from "express";
 import { authenticate } from "../../middleware/auth";
 import { chatStreamController } from "../../controllers/customer/chatStreamController";
 import { chatConversationsController } from "../../controllers/customer/chatConversationsController";
+import { chatActionsController } from "../../controllers/customer/chatActionsController";
 
 const router = Router();
 
@@ -30,5 +31,7 @@ router.get   ("/conversations/:id",            chatConversationsController.getBy
 router.patch ("/conversations/:id",            chatConversationsController.update);
 router.delete("/conversations/:id",            chatConversationsController.remove);
 router.get   ("/conversations/:id/messages",   chatConversationsController.listMessages);
+
+router.post  ("/actions/:type",                chatActionsController.execute);
 
 export default router;

@@ -6,6 +6,7 @@ import {
   processRecurringInvoices,
   runMorningBrief,
   runWeeklyReport,
+  runChatCleanup,
 } from '../controllers/cronController';
 
 const router = Router();
@@ -23,5 +24,8 @@ router.post('/morning-brief-tick',         runMorningBrief);
 
 // Sprint D-6 — every 15 min, cron-job.org POSTs here with x-cron-secret
 router.post('/weekly-report-tick',         runWeeklyReport);
+
+// Sprint D-8 — nightly chat conversation cleanup (90-day retention default)
+router.post('/chat-cleanup',               runChatCleanup);
 
 export default router;
