@@ -5,6 +5,7 @@ import { adminStatsController } from "../../controllers/admin/adminStatsControll
 import { adminMerchantsController } from "../../controllers/admin/adminMerchantsController";
 import { adminEmailEngagementController } from "../../controllers/admin/adminEmailEngagementController";
 import { adminAiUsageController } from "../../controllers/admin/adminAiUsageController";
+import { adminTaxRatesController } from "../../controllers/admin/adminTaxRatesController";
 import impersonationRouter from "./impersonation";
 
 const router = Router();
@@ -48,5 +49,11 @@ router.get("/ai-usage/summary",        adminAiUsageController.summary);
 router.get("/ai-usage/daily",          adminAiUsageController.daily);
 router.get("/ai-usage/top-merchants",  adminAiUsageController.topMerchants);
 router.get("/ai-usage/latency",        adminAiUsageController.latency);
+
+// Sprint D-11 — Effective-dated tax rate version CRUD (audit-logged).
+router.get("/regulatory/tax-rates",         adminTaxRatesController.list);
+router.post("/regulatory/tax-rates",        adminTaxRatesController.create);
+router.patch("/regulatory/tax-rates/:id",   adminTaxRatesController.update);
+router.delete("/regulatory/tax-rates/:id",  adminTaxRatesController.remove);
 
 export default router;
