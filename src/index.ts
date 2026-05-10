@@ -104,6 +104,8 @@ import customerChatRoutes from './routes/customer/chat';
 import slackIntegrationRoutes from './routes/integrations/slack';
 // Sprint D-10 — V2-dashboard rollout flag
 import customerRolloutRoutes from './routes/customer/rollout';
+// Sprint D-11 — Geo-context endpoint (auth-required)
+import customerGeoContextRoutes from './routes/customer/geoContext';
 // Sprint D-4 — register Web Push channel into the notification engine
 import { configureWebPush, webPushChannel } from './services/notifications/channels/webPushChannel';
 import { registerChannel }                  from './services/notifications/engine';
@@ -177,6 +179,8 @@ app.use('/api/customer',           customerCmdkRoutes);
 app.use('/api/integrations/slack',        slackIntegrationRoutes);
 // Sprint D-10 — V2-dashboard rollout flag (auth-required GET)
 app.use('/api/customer/rollout',          customerRolloutRoutes);
+// Sprint D-11 — Geo-context endpoint
+app.use('/api/users/me',                  customerGeoContextRoutes);
 
 // Sprint D-4 — register the Web Push channel into the engine if VAPID
 // env vars are present. Safe no-op when they're absent.
